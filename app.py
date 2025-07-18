@@ -5,7 +5,9 @@ import os
 import shutil
 import gemini_srt_translator as gst
 import httpx
+from dotenv import load_dotenv
 
+load_dotenv()
 app = FastAPI()
 
 app.add_middleware(
