@@ -16,7 +16,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-gst.gemini_api_key = os.environ.get("GEMINI_API_KEY")
+gst.gemini_api_key = os.environ.get("GOOGLE_API_KEY")
 
 INPUT_FOLDER = "srt-files"
 OUTPUT_FOLDER = "srt-prijevodi"
