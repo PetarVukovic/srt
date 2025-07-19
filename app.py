@@ -6,7 +6,6 @@ import shutil
 import gemini_srt_translator as gst
 import httpx
 from dotenv import load_dotenv
-from charset_normalizer import from_path
 
 load_dotenv()
 app = FastAPI()
@@ -85,11 +84,8 @@ async def translate_srt(file: UploadFile = File(...)):
             gst.translate()
 
             # Pročitaj sadržaj prevedenog fajla
-            with open(output_path, "rb") as f:
-                detected = from_path(output_path).best()
-                if detected is None:
-                    raise ValueError(f"Could not detect encoding for {output_path}")
-                translated_content = detected.text
+            with open(output_path, "r", encoding="utf-8") as translated_file:
+                translated_content = translated_file.read()
 
             # Pošalji sadržaj na n8n webhook
             await client.post(
