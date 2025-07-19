@@ -36,7 +36,7 @@ target_languages = [
 
 
 @app.post("/translate-srt/")
-async def translate_srt(file: UploadFile = File(...)):
+async def translate_srt(folder_id: str, file: UploadFile = File(...)):
     input_path = os.path.join(INPUT_FOLDER, file.filename)
     with open(input_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
@@ -75,7 +75,7 @@ async def translate_srt(file: UploadFile = File(...)):
                     json={
                         "language": language,
                         "filename": output_filename,
-                        "status": "translated",
+                        "folder_id": folder_id,
                         "content": translated_content,
                     },
                     timeout=10,
@@ -100,6 +100,7 @@ async def translate_srt(file: UploadFile = File(...)):
                         "filename": filename,
                         "status": "resent",
                         "content": content,
+                        "folder_id": folder_id,
                     },
                     timeout=10,
                 )
@@ -109,4 +110,9 @@ async def translate_srt(file: UploadFile = File(...)):
             except Exception as e:
                 print(f"❌ Neuspjeh slanja fajla {filename}: {e}")
 
-    return JSONResponse({"message": "✅ Translations done. Resent failed if needed."})
+    return JSONResponse(
+        {
+            "message": "✅ Translations done. Resent failed if needed.",
+            "CONTENT": content,
+        }
+    )
