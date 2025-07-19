@@ -83,13 +83,18 @@ async def translate_srt(file: UploadFile = File(...)):
             # Prijevod
             gst.translate()
 
-            # Obavijesti n8n
+            # Pročitaj sadržaj prevedenog fajla
+            with open(output_path, "r", encoding="utf-8") as translated_file:
+                translated_content = translated_file.read()
+
+            # Pošalji sadržaj na n8n webhook
             await client.post(
                 N8N_WEBHOOK_URL,
                 json={
                     "language": language,
                     "filename": output_filename,
                     "status": "translated",
+                    "content": translated_content,  # Dodano
                 },
             )
 
