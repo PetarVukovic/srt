@@ -1,4 +1,4 @@
-from fastapi import FastAPI, File, UploadFile
+from fastapi import FastAPI, File, Form, UploadFile
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 import os
@@ -36,7 +36,7 @@ target_languages = [
 
 
 @app.post("/translate-srt/")
-async def translate_srt(folder_id: str, file: UploadFile = File(...)):
+async def translate_srt(folder_id: str = Form(...), file: UploadFile = File(...)):
     input_path = os.path.join(INPUT_FOLDER, file.filename)
     with open(input_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
