@@ -113,6 +113,5 @@ async def translate_srt(folder_id: str = Form(...), file: UploadFile = File(...)
     return JSONResponse(
         {
             "message": "✅ Translations done. Resent failed if needed.",
-            "CONTENT": content,
         }
     )
