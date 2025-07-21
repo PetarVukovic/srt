@@ -1,4 +1,4 @@
-from fastapi import FastAPI, File, Form, UploadFile
+from fastapi import FastAPI, File, Form, UploadFile, BackgroundTasks
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 import os
@@ -62,14 +62,13 @@ target_languages = [
 ]
 
 
-@app.post("/translate-srt/")
-async def translate_srt(folder_id: str = Form(...), file: UploadFile = File(...)):
-    input_path = os.path.join(INPUT_FOLDER, file.filename)
-    with open(input_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
-
-    base_name = os.path.splitext(file.filename)[0]
-
+async def process_translations_in_background(
+    input_path: str, base_name: str, folder_id: str
+):
+    """
+    Ova funkcija se izvršava u pozadini.
+    Prevodi SRT datoteku na sve ciljane jezike i šalje rezultate na n8n webhook.
+    """
     failed_languages = []
 
     async with httpx.AsyncClient() as client:
@@ -80,7 +79,6 @@ async def translate_srt(folder_id: str = Form(...), file: UploadFile = File(...)
             gst.target_language = language
             gst.input_file = input_path
             gst.output_file = output_path
-            print("N8N_WEBHOOK_URL =", N8N_WEBHOOK_URL)
 
             print(f"Prevodim: {language}")
             try:
@@ -105,40 +103,64 @@ async def translate_srt(folder_id: str = Form(...), file: UploadFile = File(...)
                         "folder_id": folder_id,
                         "content": translated_content,
                     },
-                    timeout=10,
+                    timeout=30,  # Povećan timeout za slanje na webhook
                 )
                 print(f"📤 Poslano na n8n za {language}: {response.status_code}")
+                # Opcionalno: obrišite prevedenu datoteku nakon slanja
+                os.remove(output_path)
+                print(f"🗑️ Obrisano: {output_filename}")
+
             except Exception as e:
                 print(f"❌ Greška slanja na webhook za {language}: {e}")
                 failed_languages.append(language)
 
-    # Ako je bilo neuspjeha, pokušaj ponovo za sve fajlove u OUTPUT_FOLDER
+    # Opcionalno: logika za ponovno slanje neuspjelih prijevoda
     if failed_languages:
-        print("🔁 Pokušavam ponovo slati sve prevedene fajlove...")
-        for filename in os.listdir(OUTPUT_FOLDER):
-            file_path = os.path.join(OUTPUT_FOLDER, filename)
-            try:
-                with open(file_path, "r", encoding="utf-8", errors="replace") as f:
-                    content = f.read()
+        print(f"Neuspjeli prijevodi za jezike: {', '.join(failed_languages)}")
+        # Ovdje možete dodati logiku za obavještavanje ili ponovni pokušaj
 
-                response = await client.post(
-                    N8N_WEBHOOK_URL,
-                    json={
-                        "filename": filename,
-                        "status": "resent",
-                        "content": content,
-                        "folder_id": folder_id,
-                    },
-                    timeout=10,
-                )
-                print(f"📤 Ponovno poslano: {filename} ({response.status_code})")
-                os.remove(file_path)
-                print(f"🗑️ Obrisano: {filename}")
-            except Exception as e:
-                print(f"❌ Neuspjeh slanja fajla {filename}: {e}")
+    # Očisti ulaznu datoteku nakon što su svi prijevodi obrađeni
+    try:
+        os.remove(input_path)
+        print(f"🗑️ Obrisana ulazna datoteka: {input_path}")
+    except OSError as e:
+        print(f"❌ Greška pri brisanju ulazne datoteke {input_path}: {e}")
 
-    return JSONResponse(
-        {
-            "message": "✅ Translations done. Resent failed if needed.",
-        }
-    )
+
+@app.post("/translate-srt/")
+async def translate_srt(
+    background_tasks: BackgroundTasks,
+    folder_id: str = Form(...),
+    file: UploadFile = File(...),
+):
+    """
+    Ovaj endpoint odmah vraća odgovor i pokreće proces prevođenja u pozadini.
+    """
+    try:
+        input_path = os.path.join(INPUT_FOLDER, file.filename)
+        with open(input_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+
+        base_name = os.path.splitext(file.filename)[0]
+
+        # Dodaj dugotrajni proces kao pozadinski zadatak
+        background_tasks.add_task(
+            process_translations_in_background, input_path, base_name, folder_id
+        )
+
+        # Odmah vrati odgovor n8n-u
+        return JSONResponse(
+            status_code=202,  # 202 Accepted je prikladan statusni kod
+            content={
+                "message": "✅ Zahtjev primljen. Prevođenje je započelo u pozadini.",
+                "filename": file.filename,
+                "folder_id": folder_id,
+            },
+        )
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={
+                "message": f"❌ Došlo je do greške prilikom pokretanja procesa: {e}"
+            },
+        )
