@@ -1,3 +1,4 @@
+from anyio import sleep
 from fastapi import FastAPI, File, Form, UploadFile, BackgroundTasks
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -6,6 +7,8 @@ import shutil
 import gemini_srt_translator as gst
 import httpx
 from dotenv import load_dotenv
+import time
+import asyncio
 
 load_dotenv()
 app = FastAPI()
@@ -73,17 +76,25 @@ async def process_translations_in_background(
 
     async with httpx.AsyncClient() as client:
         for language in target_languages:
+            start_time = time.time()
             output_filename = f"{language}__{base_name}.srt"
             output_path = os.path.join(OUTPUT_FOLDER, output_filename)
 
             gst.target_language = language
             gst.input_file = input_path
             gst.output_file = output_path
+            gst.free_quota = True
+            gst.model_name = "gemini-2.5-flash"
 
             print(f"Prevodim: {language}")
             try:
                 gst.translate()
                 print(f"✔️ Prijevod za {language} završen.")
+                end_time = time.time()
+                print(
+                    f"⏱️ Vrijeme trajanja prijevoda za {input_path}: {round(end_time - start_time)} sekundi"
+                )
+                await asyncio.sleep(50)
             except Exception as e:
                 print(f"❌ Greška u prijevodu {language}: {e}")
                 failed_languages.append(language)
