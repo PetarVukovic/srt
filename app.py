@@ -22,6 +22,8 @@ app.add_middleware(
 )
 
 gst.gemini_api_key = os.environ.get("GOOGLE_API_KEY")
+gst.gemini_api_key2 = os.environ.get("GOOGLE_API_KEY2")
+
 
 INPUT_FOLDER = "srt-files"
 OUTPUT_FOLDER = "srt-prijevodi"
@@ -84,7 +86,6 @@ async def process_translations_in_background(
             gst.input_file = input_path
             gst.output_file = output_path
             gst.free_quota = True
-            gst.model_name = "gemini-2.5-flash"
 
             print(f"Prevodim: {language}")
             try:
