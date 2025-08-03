@@ -34,30 +34,6 @@ os.makedirs(OUTPUT_FOLDER, exist_ok=True)
 N8N_WEBHOOK_URL = os.environ.get("N8N_WEBHOOK_URL")
 
 target_languages = [
-    "English",
-    "Mandarin Chinese",
-    "Hindi",
-    "Spanish",
-    "Arabic",
-    "Bengali",
-    "Portuguese",
-    "Russian",
-    "Urdu",
-    "Indonesian",
-    "Standard German",
-    "Japanese",
-    "Swahili",
-    "Marathi",
-    "Telugu",
-    "Turkish",
-    "French",
-    "Vietnamese",
-    "Korean",
-    "Tamil",
-    "Yue Chinese (Cantonese)",
-    "Italian",
-    "Thai",
-    "Gujarati",
     "Javanese",
     "Polish",
     "Western Punjabi",
@@ -95,7 +71,7 @@ async def process_translations_in_background(
                 print(
                     f"⏱️ Vrijeme trajanja prijevoda za {input_path}: {round(end_time - start_time)} sekundi"
                 )
-                await asyncio.sleep(50)
+                await asyncio.sleep(10)
             except Exception as e:
                 print(f"❌ Greška u prijevodu {language}: {e}")
                 failed_languages.append(language)
