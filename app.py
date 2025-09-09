@@ -21,9 +21,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-gst.gemini_api_key = os.environ.get("GOOGLE_API_KEY")
-gst.gemini_api_key2 = os.environ.get("GOOGLE_API_KEY2")
-
 
 INPUT_FOLDER = "srt-files"
 OUTPUT_FOLDER = "srt-prijevodi"
@@ -75,6 +72,8 @@ async def process_translations_in_background(
     Prevodi SRT datoteku na sve ciljane jezike i šalje rezultate na n8n webhook.
     """
     failed_languages = []
+    gst.gemini_api_key = os.environ.get("GOOGLE_API_KEY")
+    gst.gemini_api_key2 = os.environ.get("GOOGLE_API_KEY2")
 
     async with httpx.AsyncClient() as client:
         for language in target_languages:
