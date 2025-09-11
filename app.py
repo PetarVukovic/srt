@@ -64,7 +64,7 @@ target_languages = [
 
 # --- Učitaj tri API ključa ---
 API_KEYS = [
-    os.environ.get("GOOGLE_API_KEY1"),
+    os.environ.get("GOOGLE_API_KEY"),
     os.environ.get("GOOGLE_API_KEY2"),
     os.environ.get("GOOGLE_API_KEY3"),
 ]
