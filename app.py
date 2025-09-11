@@ -21,7 +21,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
 INPUT_FOLDER = "srt-files"
 OUTPUT_FOLDER = "srt-prijevodi"
 
@@ -63,37 +62,60 @@ target_languages = [
     "Malayalam",
 ]
 
+# --- Učitaj tri API ključa ---
+API_KEYS = [
+    os.environ.get("GOOGLE_API_KEY1"),
+    os.environ.get("GOOGLE_API_KEY2"),
+    os.environ.get("GOOGLE_API_KEY3"),
+]
 
+if not all(API_KEYS):
+    raise RuntimeError(
+        "Nedostaju jedan ili više ključevа: GOOGLE_API_KEY_1, GOOGLE_API_KEY_2, GOOGLE_API_KEY_3."
+    )
+
+
+def split_languages_equally(langs, n_buckets=3):
+    total = len(langs)
+    per_bucket_base = total // n_buckets
+    buckets_with_extra = total % n_buckets
+    buckets = []
+    start = 0
+    for i in range(n_buckets):
+        size = per_bucket_base + (1 if i < buckets_with_extra else 0)
+        buckets.append(langs[start : start + size])
+        start += size
+    return buckets
+
+
+LANG_BUCKETS = split_languages_equally(target_languages, n_buckets=3)
+LANG_TO_KEY = {
+    lang: API_KEYS[i] for i, bucket in enumerate(LANG_BUCKETS) for lang in bucket
+}
+
+
+# --- Background Task ---
 async def process_translations_in_background(
     input_path: str, base_name: str, folder_id: str
 ):
-    """
-    Ova funkcija se izvršava u pozadini.
-    Prevodi SRT datoteku na sve ciljane jezike i šalje rezultate na n8n webhook.
-    """
     failed_languages = []
-    gst.gemini_api_key = os.environ.get("GOOGLE_API_KEY")
-    gst.gemini_api_key2 = os.environ.get("GOOGLE_API_KEY2")
-
     async with httpx.AsyncClient() as client:
         for language in target_languages:
-            start_time = time.time()
-            output_filename = f"{language}__{base_name}.srt"
-            output_path = os.path.join(OUTPUT_FOLDER, output_filename)
-
+            gst.gemini_api_key = LANG_TO_KEY[language]
             gst.target_language = language
             gst.input_file = input_path
+            output_filename = f"{language}__{base_name}.srt"
+            output_path = os.path.join(OUTPUT_FOLDER, output_filename)
             gst.output_file = output_path
             gst.free_quota = True
 
-            print(f"Prevodim: {language}")
+            print(
+                f"Prevodim: {language}  |  API ključ: {API_KEYS.index(gst.gemini_api_key)+1}"
+            )
+
             try:
                 gst.translate()
-                print(f"✔️ Prijevod za {language} završen.")
-                end_time = time.time()
-                print(
-                    f"⏱️ Vrijeme trajanja prijevoda za {input_path}: {round(end_time - start_time)} sekundi"
-                )
+                print(f"✔️ {language} završeno.")
                 await asyncio.sleep(10)
             except Exception as e:
                 print(f"❌ Greška u prijevodu {language}: {e}")
@@ -114,23 +136,17 @@ async def process_translations_in_background(
                         "folder_id": folder_id,
                         "content": translated_content,
                     },
-                    timeout=30,  # Povećan timeout za slanje na webhook
+                    timeout=30,
                 )
                 print(f"📤 Poslano na n8n za {language}: {response.status_code}")
-                # Opcionalno: obrišite prevedenu datoteku nakon slanja
                 os.remove(output_path)
-                print(f"🗑️ Obrisano: {output_filename}")
-
             except Exception as e:
                 print(f"❌ Greška slanja na webhook za {language}: {e}")
                 failed_languages.append(language)
 
-    # Opcionalno: logika za ponovno slanje neuspjelih prijevoda
     if failed_languages:
-        print(f"Neuspjeli prijevodi za jezike: {', '.join(failed_languages)}")
-        # Ovdje možete dodati logiku za obavještavanje ili ponovni pokušaj
+        print(f"⚠️ Neuspjeli prijevodi: {', '.join(failed_languages)}")
 
-    # Očisti ulaznu datoteku nakon što su svi prijevodi obrađeni
     try:
         os.remove(input_path)
         print(f"🗑️ Obrisana ulazna datoteka: {input_path}")
@@ -138,15 +154,13 @@ async def process_translations_in_background(
         print(f"❌ Greška pri brisanju ulazne datoteke {input_path}: {e}")
 
 
+# --- Endpoint ---
 @app.post("/translate-srt/")
 async def translate_srt(
     background_tasks: BackgroundTasks,
     folder_id: str = Form(...),
     file: UploadFile = File(...),
 ):
-    """
-    Ovaj endpoint odmah vraća odgovor i pokreće proces prevođenja u pozadini.
-    """
     try:
         input_path = os.path.join(INPUT_FOLDER, file.filename)
         with open(input_path, "wb") as buffer:
@@ -154,14 +168,12 @@ async def translate_srt(
 
         base_name = os.path.splitext(file.filename)[0]
 
-        # Dodaj dugotrajni proces kao pozadinski zadatak
         background_tasks.add_task(
             process_translations_in_background, input_path, base_name, folder_id
         )
 
-        # Odmah vrati odgovor n8n-u
         return JSONResponse(
-            status_code=202,  # 202 Accepted je prikladan statusni kod
+            status_code=202,
             content={
                 "message": "✅ Zahtjev primljen. Prevođenje je započelo u pozadini.",
                 "filename": file.filename,
@@ -171,7 +183,5 @@ async def translate_srt(
     except Exception as e:
         return JSONResponse(
             status_code=500,
-            content={
-                "message": f"❌ Došlo je do greške prilikom pokretanja procesa: {e}"
-            },
+            content={"message": f"❌ Greška pri pokretanju procesa: {e}"},
         )
