@@ -64,8 +64,10 @@ target_languages = [
     "Ukrainian",
     "Persian (Farsi)",
     "Malayalam",
+    "Slovenian",
+    "Serbian (on Српски!)",
+    "Macedonian (on Македонски!)",
 ]
-
 # --- Učitaj tri API ključa (obavezno) ---
 API_KEYS = [
     os.environ.get("GOOGLE_API_KEY"),
