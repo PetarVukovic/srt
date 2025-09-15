@@ -8,12 +8,18 @@ import asyncio
 import httpx
 from dotenv import load_dotenv
 from concurrent.futures import ProcessPoolExecutor
+import multiprocessing as mp
 
 # ------------- CONFIG -------------
 # koliko paralelnih prijevoda dozvoliti po API ključu (fine-tunaj po potrebi)
 MAX_CONCURRENCY_PER_KEY = 3
 # max workers za cijeli proces pool (mrežno vezano pa ne treba preveliko)
 MAX_WORKERS = max(4, (os.cpu_count() or 4))
+
+# umjesto: PROCESS_POOL = ProcessPoolExecutor(max_workers=MAX_WORKERS)
+PROCESS_POOL = ProcessPoolExecutor(
+    max_workers=MAX_WORKERS, mp_context=mp.get_context("spawn")
+)
 
 # ------------- APP SETUP ----------
 load_dotenv()
@@ -102,9 +108,6 @@ KEY_INDEX = {k: i for i, k in enumerate(API_KEYS)}
 
 # --- Semafori po ključu za rate-limit friendly concurrency ---
 KEY_SEMAPHORES = [asyncio.Semaphore(MAX_CONCURRENCY_PER_KEY) for _ in API_KEYS]
-
-# --- Globalni process pool za sve requestove (sigurno za multi-requests) ---
-PROCESS_POOL = ProcessPoolExecutor(max_workers=MAX_WORKERS)
 
 
 # ============== WORKER (u posebnom procesu) ==============
