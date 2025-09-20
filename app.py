@@ -102,22 +102,27 @@ def translate_sync_worker(
     free_quota: bool = True,
 ) -> Dict[str, Any]:
     """
-    Sinhronni worker za prevođenje jednog jezika.
+    Jednostavan sinhronni worker za prevođenje jednog jezika.
     """
     try:
-        import gemini_srt_translator as gst
-        
-        # Resetuj sve globalne varijable
-        gst.gemini_api_key = api_key
-        gst.target_language = language
-        gst.input_file = input_path
-        gst.output_file = output_path
-        gst.free_quota = free_quota
-        gst.quiet = True  # Ukloni verbose output
-        gst.use_colors = False  # Ukloni boje u thread-safe okruženju
+        from gemini_srt_translator.main import GeminiSRTTranslator
         
         start_time = time.time()
-        gst.translate()
+        
+        # Kreiraj translator instancu
+        translator = GeminiSRTTranslator(
+            gemini_api_key=api_key,
+            target_language=language,
+            input_file=input_path,
+            output_file=output_path,
+            free_quota=free_quota,
+            use_colors=True,
+            resume=True,
+        )
+        
+        # Pokreni prevođenje
+        translator.translate()
+        
         duration = round(time.time() - start_time)
         
         return {
