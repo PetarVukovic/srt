@@ -105,6 +105,7 @@ def translate_sync_worker(
     Jednostavan sinhronni worker za prevođenje jednog jezika.
     """
     try:
+        import signal
         from gemini_srt_translator.main import GeminiSRTTranslator
         
         start_time = time.time()
@@ -116,12 +117,50 @@ def translate_sync_worker(
             input_file=input_path,
             output_file=output_path,
             free_quota=free_quota,
-            use_colors=True,
+            use_colors=False,  # Disable colors to avoid terminal issues
             resume=True,
         )
         
-        # Pokreni prevođenje
-        translator.translate()
+        # Monkey patch the signal handling to avoid "signal only works in main thread" error
+        original_signal = signal.signal
+        original_raise_signal = getattr(signal, 'raise_signal', None)
+        
+        def safe_signal(sig, handler):
+            try:
+                return original_signal(sig, handler)
+            except ValueError as e:
+                if "signal only works in main thread" in str(e):
+                    # Ignore signal setup in background threads
+                    print(f"⚠️ Ignoring signal setup in background thread for {language}")
+                    return None
+                else:
+                    raise e
+        
+        def safe_raise_signal(sig):
+            try:
+                if original_raise_signal:
+                    return original_raise_signal(sig)
+            except ValueError as e:
+                if "signal only works in main thread" in str(e):
+                    # Ignore signal raising in background threads
+                    print(f"⚠️ Ignoring signal raise in background thread for {language}")
+                    return None
+                else:
+                    raise e
+        
+        # Temporarily replace signal functions with our safe versions
+        signal.signal = safe_signal
+        if original_raise_signal:
+            signal.raise_signal = safe_raise_signal
+        
+        try:
+            # Pokreni prevođenje
+            translator.translate()
+        finally:
+            # Restore original signal functions
+            signal.signal = original_signal
+            if original_raise_signal:
+                signal.raise_signal = original_raise_signal
         
         duration = round(time.time() - start_time)
         
@@ -250,7 +289,27 @@ def process_translations_sync(
     return results
 
 
-# ============== ENDPOINT ==============
+# ============== ENDPOINTS ==============
+@app.get("/")
+async def root():
+    """Root endpoint to prevent 404 errors"""
+    return {
+        "message": "🚀 SRT Translation Service",
+        "status": "active",
+        "version": "2.0",
+        "endpoints": {
+            "translate": "/translate-srt/",
+            "health": "/",
+        },
+        "supported_languages": len(target_languages),
+        "api_keys_configured": len([k for k in API_KEYS if k])
+    }
+
+@app.get("/health")
+async def health():
+    """Health check endpoint"""
+    return {"status": "healthy", "timestamp": time.time()}
+
 @app.post("/translate-srt/")
 async def translate_srt(
     background_tasks: BackgroundTasks,
