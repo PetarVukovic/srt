@@ -5,3 +5,4 @@ python-multipart
 gemini-srt-translator
 python-dotenv
 charset-normalizer
+pydantic-settings

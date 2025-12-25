@@ -1,6 +1,5 @@
 srt-venv
 .env
-main.py
 __pycache__*
 srt-files
 srt-prijevodi

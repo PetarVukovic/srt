@@ -119,6 +119,7 @@ def translate_sync_worker(
             free_quota=free_quota,
             use_colors=False,  # Disable colors to avoid terminal issues
             resume=True,
+            batch_size=300,  # Batch prijevod za manje API poziva i niže troškove
         )
         
         # Monkey patch the signal handling to avoid "signal only works in main thread" error
