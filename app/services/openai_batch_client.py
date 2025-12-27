@@ -19,11 +19,22 @@ class OpenAIBatchClient:
             completion_window="24h",
         ).id
 
-    def wait_until_done(self, batch_id: str) -> str:
+    def wait_until_done(self, batch_id: str) -> tuple[str, dict]:
         while True:
             batch = self.client.batches.retrieve(batch_id)
             if batch.status == "completed":
-                return batch.output_file_id
+                usage = {}
+                if batch.usage:
+                    usage = {
+                        "input_tokens": batch.usage.input_tokens,
+                        "output_tokens": batch.usage.output_tokens,
+                        "total_tokens": batch.usage.total_tokens,
+                    }
+                    if batch.usage.input_tokens_details:
+                        usage["cached_tokens"] = batch.usage.input_tokens_details.cached_tokens
+                    if batch.usage.output_tokens_details:
+                        usage["reasoning_tokens"] = batch.usage.output_tokens_details.reasoning_tokens
+                return batch.output_file_id, usage
             time.sleep(15)
 
     def download_results(self, file_id: str) -> str:

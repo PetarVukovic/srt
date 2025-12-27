@@ -7,6 +7,7 @@ from app.services.openai_batch_client import OpenAIBatchClient
 from app.services.webhook import WebhookService
 from app.core.config import Settings
 from typing import Optional
+from app.services.pricing_calculator import PricingCalculator, Usage
 
 class OpenAIBatchTranslationService:
 
@@ -47,8 +48,21 @@ class OpenAIBatchTranslationService:
 
         print(f"⏳ OpenAI batch started: {batch_id}")
 
-        output_file_id = client.wait_until_done(batch_id)
+        output_file_id, usage = client.wait_until_done(batch_id)
         batch_output = client.download_results(output_file_id)
+
+
+        calculator = PricingCalculator(self.settings.openai_model)
+
+        batch_usage = usage  # ovo je BatchUsage objekt
+
+        pricing = calculator.calculate(
+            Usage(
+                prompt_tokens=batch_usage.get("input_tokens", 0),
+                completion_tokens=batch_usage.get("output_tokens", 0),
+                total_tokens=batch_usage.get("total_tokens", 0),
+            )
+        )
 
         # 3. Parse
         results = BatchResultParser.split_by_language(batch_output)
@@ -78,6 +92,7 @@ class OpenAIBatchTranslationService:
                     "status": "ok",
                     "content": content,
                     "folder_id": folder_id,
+                    "pricing": pricing,
                 })
 
             else:  # bundle
@@ -86,6 +101,7 @@ class OpenAIBatchTranslationService:
                     "filename": f"{language}/{base_name}.srt",
                     "content": content,
                     "folder_id": folder_id,
+                    "pricing": pricing,
                 })
 
         if notify_mode == "bundle":
@@ -94,6 +110,7 @@ class OpenAIBatchTranslationService:
                 "total_languages": len(bundle_payload),
                 "results": bundle_payload,
                 "folder_id": folder_id,
+                "pricing": pricing,
             })
 
         print("✅ Batch done & webhook(s) sent")
