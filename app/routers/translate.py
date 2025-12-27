@@ -23,18 +23,11 @@ router = APIRouter()
 async def translate_srt(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
-    notify_mode: str = Form("per_language"),  # per_language | bundle
     languages: Optional[str] = Form(None),    # "English,Spanish,French"
     folder_id: Optional[str] = Form(None),
 ):
     settings: Settings = get_settings()
 
-    # --- validate notify mode ---
-    if notify_mode not in {"per_language", "bundle"}:
-        return JSONResponse(
-            status_code=400,
-            content={"error": "notify_mode must be 'per_language' or 'bundle'"},
-        )
 
     # --- parse languages ---
     if languages:
@@ -43,16 +36,13 @@ async def translate_srt(
             for lang in languages.split(",")
             if lang.strip()
         ]
-        if not language_list:
-            return JSONResponse(
-                status_code=400,
-                content={"error": "languages parameter is empty"},
-            )
+
     else:
         language_list = TARGET_LANGUAGES
 
     # --- save input file ---
     input_path = os.path.join(settings.input_folder, file.filename)
+
     with open(input_path, "wb") as f:
         shutil.copyfileobj(file.file, f)
 
@@ -66,14 +56,12 @@ async def translate_srt(
         input_path=input_path,
         base_name=base_name,
         languages=language_list,
-        notify_mode=notify_mode,
         folder_id=folder_id,
     )
 
     return {
         "status": "accepted",
         "message": "Batch translation started",
-        "notify_mode": notify_mode,
         "languages_count": len(language_list),
         "languages": language_list,
     }

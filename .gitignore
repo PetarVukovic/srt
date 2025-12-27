@@ -3,3 +3,5 @@ srt-venv
 __pycache__*
 srt-files
 srt-prijevodi
+jsonl
+tmp

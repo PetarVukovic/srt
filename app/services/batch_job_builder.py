@@ -5,6 +5,7 @@ import srt
 
 
 class MultiLangBatchJobBuilder:
+    """Builds a batch job for multiple languages."""
     def __init__(self, model: str):
         self.model = model
 
@@ -15,6 +16,7 @@ class MultiLangBatchJobBuilder:
         output_jsonl: str,
         batch_size: int,
     ) -> str:
+        """Builds a batch job for multiple languages."""
         subtitles = list(
             srt.parse(open(input_srt, encoding="utf-8").read())
         )
@@ -23,14 +25,16 @@ class MultiLangBatchJobBuilder:
         batch_size = min(batch_size, 60)
 
         with open(output_jsonl, "w", encoding="utf-8") as f:
+            #Iteration over languages
             for language in languages:
+                #Iteration over chunks of srt file for that language and creating batch items
                 for i in range(0, len(subtitles), batch_size):
                     chunk = subtitles[i : i + batch_size]
 
                     payload = [
                         {"index": i + j, "content": s.content}
                         for j, s in enumerate(chunk)
-                    ]
+                    ] #lista dictova koja sadrzi index i chunck srt fila
 
                     request = {
                         "custom_id": f"{language}:{i}",
@@ -39,7 +43,7 @@ class MultiLangBatchJobBuilder:
                         "body": {
                             "model": self.model,
                             "temperature": 0.2,
-                            "max_tokens": 2000,
+                            "max_tokens": 5000,
                             "messages": [
                                 {
                                     "role": "system",

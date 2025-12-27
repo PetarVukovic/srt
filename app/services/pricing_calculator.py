@@ -42,12 +42,6 @@ class PricingCalculator:
 
         return {
             "model": self.model,
-            "prompt_tokens": usage.prompt_tokens,
-            "completion_tokens": usage.completion_tokens,
             "total_tokens": usage.total_tokens,
             "cost_usd": total_cost,
-            "breakdown": {
-                "input_cost_usd": round(input_cost, 6),
-                "output_cost_usd": round(output_cost, 6),
-            },
         }

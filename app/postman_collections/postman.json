@@ -1,0 +1,69 @@
+{
+    "info": {
+        "name": "SRT Translation Service – Local",
+        "description": "Local FastAPI SRT Batch Translation Service",
+        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+    },
+    "item": [
+        {
+            "name": "Health Check",
+            "request": {
+                "method": "GET",
+                "url": {
+                    "raw": "{{base_url}}/",
+                    "host": [
+                        "{{base_url}}"
+                    ],
+                    "path": [
+                        ""
+                    ]
+                }
+            }
+        },
+        {
+            "name": "Translate SRT (Batch)",
+            "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                    "mode": "formdata",
+                    "formdata": [
+                        {
+                            "key": "file",
+                            "type": "file",
+                            "description": "SRT subtitle file",
+                            "src": ""
+                        },
+                        {
+                            "key": "languages",
+                            "value": "English,Spanish,French",
+                            "type": "text",
+                            "description": "Comma separated target languages"
+                        },
+                        {
+                            "key": "folder_id",
+                            "value": "postman-test",
+                            "type": "text",
+                            "description": "Optional folder identifier"
+                        }
+                    ]
+                },
+                "url": {
+                    "raw": "{{base_url}}/translate-srt",
+                    "host": [
+                        "{{base_url}}"
+                    ],
+                    "path": [
+                        "translate-srt"
+                    ]
+                }
+            }
+        }
+    ],
+    "variable": [
+        {
+            "key": "base_url",
+            "value": "http://127.0.0.1:8000"
+        }
+    ]
+}

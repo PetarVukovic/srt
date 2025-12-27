@@ -15,13 +15,12 @@ class OpenAIBatchTranslationService:
         self.settings = settings
         self.webhook = WebhookService(settings)
 
-    def translate_and_notify(
+    async def translate_and_notify(
         self,
         input_path: str,
         base_name: str,
         languages: list[str],
         folder_id: Optional[str] = None,
-        notify_mode: str = "per_language",  # or "bundle"
     ):
         # 1. Build batch
         builder = MultiLangBatchJobBuilder(
@@ -31,7 +30,7 @@ class OpenAIBatchTranslationService:
         jsonl_path = os.path.join(
             self.settings.temp_folder,
             "openai_multilang_batch.jsonl",
-        )
+        )#Ovo je input za OpenAI batch
 
         builder.build(
             input_srt=input_path,
@@ -43,24 +42,22 @@ class OpenAIBatchTranslationService:
         # 2. Run batch
         client = OpenAIBatchClient(self.settings.openai_api_key)
 
-        file_id = client.upload(jsonl_path)
-        batch_id = client.create_batch(file_id)
+        file_id = await client.upload(jsonl_path)
+        batch_id = await client.create_batch(file_id)
 
         print(f"⏳ OpenAI batch started: {batch_id}")
 
-        output_file_id, usage = client.wait_until_done(batch_id)
-        batch_output = client.download_results(output_file_id)
+        output_file_id, usage = await client.wait_until_done(batch_id)
+        batch_output = await client.download_results(output_file_id)
 
 
         calculator = PricingCalculator(self.settings.openai_model)
 
-        batch_usage = usage  # ovo je BatchUsage objekt
-
         pricing = calculator.calculate(
             Usage(
-                prompt_tokens=batch_usage.get("input_tokens", 0),
-                completion_tokens=batch_usage.get("output_tokens", 0),
-                total_tokens=batch_usage.get("total_tokens", 0),
+                prompt_tokens=usage.get("input_tokens", 0),
+                completion_tokens=usage.get("output_tokens", 0),
+                total_tokens=usage.get("total_tokens", 0),
             )
         )
 
@@ -85,18 +82,7 @@ class OpenAIBatchTranslationService:
             with open(output_srt, "r", encoding="utf-8") as f:
                 content = f.read()
 
-            if notify_mode == "per_language":
-                self.webhook.send({
-                    "language": language,
-                    "filename": f"{language}/{base_name}.srt",
-                    "status": "ok",
-                    "content": content,
-                    "folder_id": folder_id,
-                    "pricing": pricing,
-                })
-
-            else:  # bundle
-                bundle_payload.append({
+            bundle_payload.append({
                     "language": language,
                     "filename": f"{language}/{base_name}.srt",
                     "content": content,
@@ -104,8 +90,7 @@ class OpenAIBatchTranslationService:
                     "pricing": pricing,
                 })
 
-        if notify_mode == "bundle":
-            self.webhook.send({
+        self.webhook.send({
                 "job": "srt-translation",
                 "total_languages": len(bundle_payload),
                 "results": bundle_payload,
