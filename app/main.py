@@ -10,6 +10,9 @@ from app.routers import health, translate
 from app.core.config import get_settings, setup_folders
 
 
+#TODO
+#1. Prebaciti txt filove da se spremaju u bazu podataka u postgres na render.com
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup

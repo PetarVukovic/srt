@@ -23,11 +23,10 @@ router = APIRouter()
 async def translate_srt(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
-    languages: Optional[str] = Form(None),    # "English,Spanish,French"
+    languages: Optional[str] = Form(None),  
     folder_id: Optional[str] = Form(None),
 ):
     settings: Settings = get_settings()
-
 
     # --- parse languages ---
     if languages:
