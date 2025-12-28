@@ -2,28 +2,35 @@ import os
 from functools import lru_cache
 from typing import List
 from pydantic_settings import BaseSettings
+from pydantic import Field,SecretStr,AliasChoices,PostgresDsn
 
 
 class Settings(BaseSettings):
-    # OpenAI
-    openai_api_key: str
+    openai_api_key: SecretStr = Field(
+        ...,
+       validation_alias=AliasChoices("OPENAI_API_KEY","openai_api_key")
+    )
+
     openai_model: str = "gpt-4.1-mini"
 
-    # Webhook
-    n8n_webhook_url: str
+    n8n_webhook_url: str = Field(
+        ...,
+        validation_alias=AliasChoices("N8N_WEBHOOK_URL", "N8N"),
+    )
 
-    # Folders
-    input_folder: str = "srt-files"
-    output_folder: str = "srt-prijevodi"
-    temp_folder: str = "tmp"
-
-    # Translation
     batch_size: int = 100
 
-    class Config:
-        env_file = ".env"
-        case_sensitive = False
-        extra = "ignore"
+    database_url: PostgresDsn = Field(
+        ...,
+        validation_alias=AliasChoices("DATABASE_URL", "database_url"),
+    )
+
+    model_config = {
+        "env_file": ".env",
+        "env_file_encoding": "utf-8",
+        "extra": "ignore"
+    }
+
 
 
 @lru_cache
@@ -66,9 +73,3 @@ TARGET_LANGUAGES: List[str] = [
     # "Serbian (on Српски!)",
     # "Macedonian (on Македонски!)",
 ]
-
-
-def setup_folders(settings: Settings):
-    os.makedirs(settings.input_folder, exist_ok=True)
-    os.makedirs(settings.output_folder, exist_ok=True)
-    os.makedirs(settings.temp_folder, exist_ok=True)

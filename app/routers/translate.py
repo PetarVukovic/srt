@@ -16,11 +16,11 @@ from app.services.openai_batch_translation_service import (
     OpenAIBatchTranslationService,
 )
 
-router = APIRouter()
+router = APIRouter(prefix="batch/translate",tags="translate")
 
 
-@router.post("/translate-srt")
-async def translate_srt(
+@router.post("/batch-translate-srt")
+async def batch_translate_srt(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     languages: Optional[str] = Form(None),  
