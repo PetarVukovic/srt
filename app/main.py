@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app import __version__
 from app.routers import health, translate
-from app.core.config import get_settings, setup_folders
+from app.core.config import get_settings
 
 
 #TODO
@@ -17,7 +17,6 @@ from app.core.config import get_settings, setup_folders
 async def lifespan(app: FastAPI):
     # Startup
     settings = get_settings()
-    setup_folders(settings)
     print(f"🚀 SRT Translation Service v{__version__} started")
 
     yield
