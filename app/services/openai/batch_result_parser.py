@@ -5,6 +5,7 @@ from collections import defaultdict
 
 import json
 import re
+from .batch_job_builder import detect_file_encoding
 
 def safe_json_parse(content: str):
     """
@@ -88,8 +89,32 @@ class BatchResultParser:
         return results
     @staticmethod
     def apply_translations(original_srt: str, translated_lines, output_srt: str):
-       with open(original_srt, encoding="utf-8") as f:
-           subtitles = list(srt.parse(f.read()))
+       # Detect encoding of original file
+       encoding = detect_file_encoding(original_srt)
+       
+       try:
+           with open(original_srt, encoding="utf-8") as f:
+               subtitles = list(srt.parse(f.read()))
+       except UnicodeDecodeError as e:
+           print(f"❌ Failed to read original SRT with utf-8: {e}")
+           # Try detected encoding first, then fallbacks
+           try:
+               with open(original_srt, encoding=encoding) as f:
+                   subtitles = list(srt.parse(f.read()))
+               print(f"✅ Successfully read original SRT with {encoding}")
+           except UnicodeDecodeError:
+               fallback_encodings = ['utf-16', 'latin-1', 'cp1252']
+               for enc in fallback_encodings:
+                   try:
+                       with open(original_srt, encoding=enc) as f:
+                           subtitles = list(srt.parse(f.read()))
+                       print(f"✅ Successfully read original SRT with {enc}")
+                       break
+                   except UnicodeDecodeError:
+                       continue
+               else:
+                   raise ValueError(f"Could not read original SRT file {original_srt}")
+       
        for item in translated_lines:
             idx = item["index"]
 

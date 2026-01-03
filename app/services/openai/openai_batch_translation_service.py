@@ -203,12 +203,16 @@ class OpenAIBatchTranslationService:
         )
 
         # Create structured batch requests for all languages
-        output_jsonl=builder.build(
+        output_jsonl = builder.build(
             input_srt=input_path,
             languages=languages,
             output_jsonl=jsonl_path,
             batch_size=self.settings.batch_size,
         )
+        
+        # Debug: Save JSONL locally for inspection
+        print(f"💾 JSONL saved to: {jsonl_path}")
+        print(f"📊 JSONL file size: {os.path.getsize(jsonl_path)} bytes")
 
         # 2. Execute batch job with OpenAI
         client = OpenAIBatchClient(self.settings.openai_api_key)
@@ -280,6 +284,11 @@ class OpenAIBatchTranslationService:
         })
 
         print("✅ Batch done & webhook(s) sent")
+
+
+        if not self.settings.deployment == "local":
+            os.unlink(input_path)
+            os.unlink(output_jsonl)
         
         return {
             "job": "srt-translation",

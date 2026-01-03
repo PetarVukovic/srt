@@ -2,7 +2,11 @@ fastapi
 uvicorn
 httpx
 python-multipart
-gemini-srt-translator
 python-dotenv
 charset-normalizer
 pydantic-settings
+openai
+pydantic
+pydantic-core
+chardet
+srt
