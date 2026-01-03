@@ -40,83 +40,83 @@ except ImportError:
 
 
 
-def analyze_batch_output(batch_output: str, temp_folder: str) -> int:
-    """
-    Analyze and log OpenAI batch output for debugging purposes.
+# def analyze_batch_output(batch_output: str, temp_folder: str) -> int:
+#     """
+#     Analyze and log OpenAI batch output for debugging purposes.
     
-    This function creates a detailed analysis file showing the structure
-    and content of batch API responses, useful for debugging translation issues.
+#     This function creates a detailed analysis file showing the structure
+#     and content of batch API responses, useful for debugging translation issues.
     
-    Args:
-        batch_output (str): Raw batch output from OpenAI API.
-                           Contains JSONL formatted responses.
-        temp_folder (str): Path to temporary folder for debug file.
-                          Must exist and be writable.
+#     Args:
+#         batch_output (str): Raw batch output from OpenAI API.
+#                            Contains JSONL formatted responses.
+#         temp_folder (str): Path to temporary folder for debug file.
+#                           Must exist and be writable.
     
-    Returns:
-        int: Number of lines processed in the batch output.
-             Useful for logging and monitoring.
+#     Returns:
+#         int: Number of lines processed in the batch output.
+#              Useful for logging and monitoring.
     
-    Process:
-        1. Create debug analysis file
-        2. Analyze batch output metadata
-        3. Parse each JSON line individually
-        4. Log validation results and content preview
-        5. Save raw output for reference
-    """
-    debug_file = os.path.join(temp_folder, "batch_output_debug.txt")
+#     Process:
+#         1. Create debug analysis file
+#         2. Analyze batch output metadata
+#         3. Parse each JSON line individually
+#         4. Log validation results and content preview
+#         5. Save raw output for reference
+#     """
+#     debug_file = os.path.join(temp_folder, "batch_output_debug.txt")
     
-    with open(debug_file, "w", encoding="utf-8") as f:
-        f.write("=== OPENAI BATCH OUTPUT ANALYSIS ===\n\n")
-        f.write(f"Batch Output Type: {type(batch_output)}\n")
-        f.write(f"Batch Output Length: {len(batch_output)} characters\n\n")
+#     with open(debug_file, "w", encoding="utf-8") as f:
+#         f.write("=== OPENAI BATCH OUTPUT ANALYSIS ===\n\n")
+#         f.write(f"Batch Output Type: {type(batch_output)}\n")
+#         f.write(f"Batch Output Length: {len(batch_output)} characters\n\n")
         
-        # Split by lines for analysis
-        lines = batch_output.split('\n')
-        f.write(f"Total Lines: {len(lines)}\n\n")
+#         # Split by lines for analysis
+#         lines = batch_output.split('\n')
+#         f.write(f"Total Lines: {len(lines)}\n\n")
         
-        # Analyze each line
-        f.write("=== LINE BY LINE ANALYSIS ===\n")
-        valid_json_count = 0
-        invalid_json_count = 0
+#         # Analyze each line
+#         f.write("=== LINE BY LINE ANALYSIS ===\n")
+#         valid_json_count = 0
+#         invalid_json_count = 0
         
-        for i, line in enumerate(lines):
-            if line.strip():  # Only process non-empty lines
-                try:
-                    import json
-                    parsed = json.loads(line)
-                    valid_json_count += 1
+#         for i, line in enumerate(lines):
+#             if line.strip():  # Only process non-empty lines
+#                 try:
+#                     import json
+#                     parsed = json.loads(line)
+#                     valid_json_count += 1
                     
-                    f.write(f"Line {i+1}: VALID JSON\n")
-                    f.write(f"  - Custom ID: {parsed.get('custom_id', 'N/A')}\n")
-                    f.write(f"  - Status: {parsed.get('response', {}).get('status', 'N/A')}\n")
-                    f.write(f"  - Has content: {'body' in parsed.get('response', {})}\n")
-                    f.write(f"  - Content preview: {str(parsed)[:100]}...\n")
-                    f.write("-" * 50 + "\n")
-                except json.JSONDecodeError as e:
-                    invalid_json_count += 1
+#                     f.write(f"Line {i+1}: VALID JSON\n")
+#                     f.write(f"  - Custom ID: {parsed.get('custom_id', 'N/A')}\n")
+#                     f.write(f"  - Status: {parsed.get('response', {}).get('status', 'N/A')}\n")
+#                     f.write(f"  - Has content: {'body' in parsed.get('response', {})}\n")
+#                     f.write(f"  - Content preview: {str(parsed)[:100]}...\n")
+#                     f.write("-" * 50 + "\n")
+#                 except json.JSONDecodeError as e:
+#                     invalid_json_count += 1
                     
-                    f.write(f"Line {i+1}: INVALID JSON\n")
-                    f.write(f"  - Error: {str(e)}\n")
-                    f.write(f"  - Raw content: {line[:100]}...\n")
-                    f.write("-" * 50 + "\n")
-            else:
-                f.write(f"Line {i+1}: EMPTY LINE\n")
-                f.write("-" * 50 + "\n")
+#                     f.write(f"Line {i+1}: INVALID JSON\n")
+#                     f.write(f"  - Error: {str(e)}\n")
+#                     f.write(f"  - Raw content: {line[:100]}...\n")
+#                     f.write("-" * 50 + "\n")
+#             else:
+#                 f.write(f"Line {i+1}: EMPTY LINE\n")
+#                 f.write("-" * 50 + "\n")
         
-        # Summary statistics
-        f.write(f"\n=== SUMMARY ===\n")
-        f.write(f"Valid JSON lines: {valid_json_count}\n")
-        f.write(f"Invalid JSON lines: {invalid_json_count}\n")
-        f.write(f"Empty lines: {len(lines) - valid_json_count - invalid_json_count}\n")
+#         # Summary statistics
+#         f.write(f"\n=== SUMMARY ===\n")
+#         f.write(f"Valid JSON lines: {valid_json_count}\n")
+#         f.write(f"Invalid JSON lines: {invalid_json_count}\n")
+#         f.write(f"Empty lines: {len(lines) - valid_json_count - invalid_json_count}\n")
         
-        f.write("\n=== RAW BATCH OUTPUT ===\n")
-        f.write(batch_output)
+#         f.write("\n=== RAW BATCH OUTPUT ===\n")
+#         f.write(batch_output)
     
-    print(f"🔍 Debug analysis saved to: {debug_file}")
-    print(f"📊 Batch output contains {len(lines)} lines ({valid_json_count} valid, {invalid_json_count} invalid)")
+#     print(f"🔍 Debug analysis saved to: {debug_file}")
+#     print(f"📊 Batch output contains {len(lines)} lines ({valid_json_count} valid, {invalid_json_count} invalid)")
     
-    return len(lines)
+#     return len(lines)
 
 
 class OpenAIBatchTranslationService:
@@ -239,7 +239,7 @@ class OpenAIBatchTranslationService:
         )
         
         # Debug: Analyze batch output
-        analyze_batch_output(batch_output, self.settings.temp_folder)
+        #analyze_batch_output(batch_output, self.settings.temp_folder)
         
         results = BatchResultParser.split_by_language(batch_output)
 
