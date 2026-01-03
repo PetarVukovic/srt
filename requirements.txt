@@ -10,3 +10,4 @@ pydantic
 pydantic-core
 chardet
 srt
+requests
