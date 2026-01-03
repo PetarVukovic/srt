@@ -46,7 +46,7 @@ def create_app() -> FastAPI:
 
     # Include routers
     application.include_router(health.router, tags=["Health"])
-    application.include_router(translate.router, tags=["Translation"])
+    application.include_router(translate.router)
 
     return application
 
