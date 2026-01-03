@@ -45,24 +45,46 @@ class BatchResultParser:
             if not line:
                 continue
 
-            record = json.loads(line)
-
-            if record.get("error"):
+            try:
+                record = json.loads(line)
+            except json.JSONDecodeError as e:
+                print(f"❌ Failed to parse JSON line: {e}")
                 continue
 
-            lang, _ = record["custom_id"].rsplit(":", 1)
+            # Skip if record has errors or invalid status
+            if record.get("error"):
+                print(f"❌ Skipping record with error: {record.get('error')}")
+                continue
 
-            content = (
-                record["response"]["body"]["choices"][0]["message"]["content"]
-            )
+            # Extract response from record
+            response = record.get("response", {})
 
+            # Extract language from custom_id
+            try:
+                lang, _ = record["custom_id"].rsplit(":", 1)
+            except (ValueError, KeyError) as e:
+                print(f"❌ Failed to extract language from custom_id: {record.get('custom_id')}")
+                continue
+
+            # Extract content from response body
+            try:
+                content = (
+                    response["body"]["choices"][0]["message"]["content"]
+                )
+            except (KeyError, IndexError, TypeError) as e:
+                print(f"❌ Failed to extract content for {lang}: {e}")
+                continue
+
+            # Parse translated content
             try:
                 parsed = safe_json_parse(content)
                 results[lang].extend(parsed)
+                print(f"✅ Successfully parsed {len(parsed)} items for {lang}")
             except Exception as e:
-                print(f"❌ Failed to parse {lang}: {e}")
+                print(f"❌ Failed to parse content for {lang}: {e}")
                 continue
 
+        print(f"📊 Parsed results for {len(results)} languages: {list(results.keys())}")
         return results
     @staticmethod
     def apply_translations(original_srt: str, translated_lines, output_srt: str):

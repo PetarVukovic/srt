@@ -6,12 +6,12 @@ from pydantic import Field,SecretStr,AliasChoices,PostgresDsn
 
 
 class Settings(BaseSettings):
-    openai_api_key: SecretStr = Field(
+    openai_api_key: str = Field(
         ...,
        validation_alias=AliasChoices("OPENAI_API_KEY","openai_api_key")
     )
 
-    openai_model: str = "gpt-4.1-mini"
+    openai_model: str = "gpt-4.1"
 
     n8n_webhook_url: str = Field(
         ...,
@@ -19,6 +19,10 @@ class Settings(BaseSettings):
     )
 
     batch_size: int = 100
+
+    input_folder: str = "./app/srt_input"
+    output_folder: str = "./app/batch_output"
+    temp_folder: str = "./app/batch_inputs"
 
     database_url: PostgresDsn = Field(
         ...,
@@ -33,43 +37,42 @@ class Settings(BaseSettings):
 
 
 
-@lru_cache
 def get_settings() -> Settings:
     return Settings()
 
 
 TARGET_LANGUAGES: List[str] = [
      "English",
-    # # "Mandarin Chinese",
-    # # "Hindi",
-    # # "Spanish",
-    # # "Arabic",
-    # # "Bengali",
-    # # "Portuguese",
-    # # "Russian",
-    # # "Urdu",
-    # # "Indonesian",
-    # "Standard German",
-    # "Japanese",
-    # "Swahili",
-    # "Marathi",
-    # "Telugu",
-    # "Turkish",
-    # "French",
-    # "Vietnamese",
-    # "Korean",
-    # "Tamil",
-    # "Yue Chinese (Cantonese)",
-    # "Italian",
-    # "Thai",
-    # "Gujarati",
-    # "Javanese",
-    # "Polish",
-    # "Western Punjabi",
-    # "Ukrainian",
-    # "Persian (Farsi)",
-    # "Malayalam",
-    # "Slovenian",
-    # "Serbian (on Српски!)",
-    # "Macedonian (on Македонски!)",
+    "Mandarin Chinese",
+    "Hindi",
+    "Spanish",
+    "Arabic",
+    "Bengali",
+    "Portuguese",
+    "Russian",
+    "Urdu",
+    "Indonesian",
+    "Standard German",
+    "Japanese",
+    "Swahili",
+    "Marathi",
+    "Telugu",
+    "Turkish",
+    "French",
+    "Vietnamese",
+    "Korean",
+    "Tamil",
+    "Yue Chinese (Cantonese)",
+    "Italian",
+    "Thai",
+    "Gujarati",
+    "Javanese",
+    "Polish",
+    "Western Punjabi",
+    "Ukrainian",
+    "Persian (Farsi)",
+    "Malayalam",
+    "Slovenian",
+    "Serbian (on Српски!)",
+    "Macedonian (on Македонски!)",
 ]

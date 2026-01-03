@@ -1,22 +1,18 @@
 """Translation API endpoints."""
 
 import os
-import shutil
-from typing import Optional, List
-
-from fastapi import APIRouter, BackgroundTasks, File, Form, UploadFile
-from fastapi.responses import JSONResponse
-
+from typing import Optional
+from fastapi import APIRouter, BackgroundTasks, File, Form, UploadFile, HTTPException
 from app.core.config import (
     Settings,
     get_settings,
     TARGET_LANGUAGES,
 )
-from app.services.openai_batch_translation_service import (
-    OpenAIBatchTranslationService,
-)
+from app.services.openai import OpenAIBatchTranslationService
+    
 
-router = APIRouter(prefix="batch/translate",tags="translate")
+
+router = APIRouter(prefix="/batch/translate", tags=["translate"])
 
 
 @router.post("/batch-translate-srt")
@@ -40,12 +36,19 @@ async def batch_translate_srt(
         language_list = TARGET_LANGUAGES
 
     # --- save input file ---
-    input_path = os.path.join(settings.input_folder, file.filename)
-
-    with open(input_path, "wb") as f:
-        shutil.copyfileobj(file.file, f)
-
-    base_name = os.path.splitext(file.filename)[0]
+    base_name = os.path.splitext(file.filename)[0] # razdvaja ime od ekstenzije (npr. video.srt -> video)
+    input_path = os.path.join(settings.input_folder, f"{base_name}.srt") # "/app/temp/input" + "moj_film_eng.srt"
+    
+    # Ensure input directory exists
+    os.makedirs(settings.input_folder, exist_ok=True)
+    
+    # Read file content asynchronously and save
+    try:
+        content = await file.read()
+        with open(input_path, "wb") as f:
+            f.write(content)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to save uploaded file: {str(e)}")
 
     service = OpenAIBatchTranslationService(settings)
 
@@ -62,5 +65,4 @@ async def batch_translate_srt(
         "status": "accepted",
         "message": "Batch translation started",
         "languages_count": len(language_list),
-        "languages": language_list,
     }
