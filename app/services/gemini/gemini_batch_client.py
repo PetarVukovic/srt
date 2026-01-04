@@ -7,7 +7,7 @@ large volumes of translation requests asynchronously.
 
 import json
 import time
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any
 from google import genai
 from google.genai import types
 from google.genai.errors import ClientError

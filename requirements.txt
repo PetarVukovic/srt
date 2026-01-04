@@ -10,5 +10,5 @@ pydantic
 pydantic-core
 chardet
 srt
-google-generativeai
+google-genai
 requests
