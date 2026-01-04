@@ -1,6 +1,7 @@
 """Translation API endpoints."""
 
 import os
+import tempfile
 from typing import Optional, List
 from fastapi import APIRouter, BackgroundTasks, File, Form, UploadFile, HTTPException
 from app.core.config import (
@@ -12,6 +13,28 @@ from app.services.openai import OpenAIBatchTranslationService
 from app.services.gemini import GeminiBatchTranslationService
 
 router = APIRouter(prefix="/batch/translate", tags=["translate"])
+
+def cleanup_file(file_path: str) -> None:
+    """Safely remove file if it exists."""
+    try:
+        if os.path.exists(file_path):
+            os.unlink(file_path)
+            print(f"🗑️ Cleaned up: {file_path}")
+    except Exception as e:
+        print(f"⚠️ Failed to cleanup {file_path}: {e}")
+
+def cleanup_batch_files(base_name: str, settings: Settings) -> None:
+    """Clean up batch-related files."""
+    # Clean up input SRT file
+    input_path = os.path.join(settings.input_folder, f"{base_name}.srt")
+    cleanup_file(input_path)
+    
+    # Clean up batch JSONL files
+    batch_jsonl = os.path.join(settings.temp_folder, f"{base_name}_batch.jsonl")
+    cleanup_file(batch_jsonl)
+    
+    gemini_jsonl = os.path.join(settings.temp_folder, f"{base_name}_gemini_batch.jsonl")
+    cleanup_file(gemini_jsonl)
 
 
 @router.post("/batch-translate-srt")
@@ -78,6 +101,13 @@ async def batch_translate_srt(
                 languages=language_list,
                 folder_id=folder_id,
             )
+            
+            # Add cleanup task (runs after translation completes)
+            background_tasks.add_task(
+                cleanup_batch_files,
+                base_name=base_name,
+                settings=settings,
+            )
 
             accepted_files.append(file.filename)
     # Handle single file case
@@ -103,6 +133,13 @@ async def batch_translate_srt(
                 base_name=base_name,
                 languages=language_list,
                 folder_id=folder_id,
+            )
+            
+            # Add cleanup task (runs after translation completes)
+            background_tasks.add_task(
+                cleanup_batch_files,
+                base_name=base_name,
+                settings=settings,
             )
 
             accepted_files.append(file.filename)

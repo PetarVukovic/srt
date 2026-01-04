@@ -155,22 +155,16 @@ class OpenAIBatchTranslationService:
         input_path: str,
         base_name: str,
         languages: List[str],
-        folder_id: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        folder_id: str = None,
+    ):
         """
-        Translate SRT file to multiple languages using OpenAI Batch API.
-        
-        This is the main method that orchestrates the complete translation workflow:
-        1. Builds batch job requests for all target languages
-        2. Submits to OpenAI Batch API
-        3. Waits for completion and downloads results
-        4. Parses and processes translated content
-        5. Calculates pricing information
-        6. Sends webhook notifications with results
+        Translate SRT file and send notification.
         
         Args:
-            input_path (str): Path to the source SRT subtitle file.
-                             Must be UTF-8 encoded and contain valid SRT format.
+            input_path (str): Path to input SRT file
+            base_name (str): Base name for output files
+            languages (List[str]): List of target languages
+            folder_id (str): Optional folder ID
                              Example: "/path/to/subtitles.srt"
             
             base_name (str): Base name for output files (without extension).
@@ -191,6 +185,15 @@ class OpenAIBatchTranslationService:
                 - pricing: Complete pricing information with cost breakdown
 
         """
+        # Check if input file exists at the beginning
+        if not os.path.exists(input_path):
+            print(f"❌ Input file not found: {input_path}")
+            raise FileNotFoundError(f"Input SRT file not found: {input_path}")
+        
+        print(f"🚀 Starting OpenAI batch translation: {base_name}")
+        print(f"🌍 Languages: {languages}")
+        print(f"📁 Input: {input_path}")
+        
         # 1. Build batch job for OpenAI processing
         builder = MultiLangBatchJobBuilder(
             model=self.settings.openai_model
@@ -253,6 +256,11 @@ class OpenAIBatchTranslationService:
                 language,
                 f"{base_name}.srt",
             )
+
+            # Check if original file exists
+            if not os.path.exists(input_path):
+                print(f"❌ Original SRT file not found: {input_path}")
+                continue
 
             # Apply translations to create final SRT file
             BatchResultParser.apply_translations(

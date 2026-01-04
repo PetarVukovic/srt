@@ -27,9 +27,24 @@ class Settings(BaseSettings):
 
     batch_size: int = 100
 
-    input_folder: str = "./app/srt_input"
-    output_folder: str = "./app/batch_output"
-    temp_folder: str = "./app/batch_inputs"
+    # Paths - different for local vs production
+    @property
+    def input_folder(self) -> str:
+        if self.deployment == "prod":
+            return "/opt/render/project/src/app/srt_input"
+        return "./app/srt_input"
+    
+    @property  
+    def output_folder(self) -> str:
+        if self.deployment == "prod":
+            return "/opt/render/project/src/app/batch_output"
+        return "./app/batch_output"
+    
+    @property
+    def temp_folder(self) -> str:
+        if self.deployment == "prod":
+            return "/opt/render/project/src/app/batch_inputs"
+        return "./app/batch_inputs"
 
     # database_url: PostgresDsn = Field(
     #     ...,

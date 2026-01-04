@@ -47,17 +47,19 @@ class GeminiBatchTranslationService:
         folder_id: str = None,
     ) -> Dict[str, Any]:
         """
-        Translate SRT file and save results.
+        Translate SRT file using Gemini Batch API and send notification.
         
         Args:
             input_path (str): Path to input SRT file
             base_name (str): Base name for output files
-            languages (List[str]): Target language codes
-            folder_id (str): Optional folder ID for organization
-            
-        Returns:
-            Dict[str, Any]: Translation results and metadata
+            languages (List[str]): List of target languages
+            folder_id (str): Optional folder ID
         """
+        # Check if input file exists at the beginning
+        if not os.path.exists(input_path):
+            print(f"❌ Input file not found: {input_path}")
+            raise FileNotFoundError(f"Input SRT file not found: {input_path}")
+        
         print(f"🚀 Starting Gemini batch translation: {base_name}")
         print(f"🌍 Languages: {languages}")
         print(f"📁 Input: {input_path}")
