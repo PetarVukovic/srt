@@ -1,6 +1,6 @@
 import os
 from functools import lru_cache
-from typing import List
+from typing import List, Optional
 from pydantic_settings import BaseSettings
 from pydantic import Field,SecretStr,AliasChoices,PostgresDsn
 
@@ -13,8 +13,8 @@ class Settings(BaseSettings):
 
     openai_model: str = "gpt-4.1-mini"
 
-    gemini_api_key: str = Field(
-        ...,
+    gemini_api_key: Optional[str] = Field(
+        None,
         validation_alias=AliasChoices("GEMINI_API_KEY", "gemini_api_key")
     )
 

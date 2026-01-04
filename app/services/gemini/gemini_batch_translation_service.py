@@ -32,6 +32,9 @@ class GeminiBatchTranslationService:
         Args:
             settings (Settings): Application settings
         """
+        if not settings.gemini_api_key:
+            raise ValueError("Gemini API key is required. Please set GEMINI_API_KEY environment variable.")
+        
         self.settings = settings
         self.client = GeminiBatchClient(settings.gemini_api_key)
         self.builder = GeminiBatchJobBuilder(settings.gemini_model)

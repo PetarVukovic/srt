@@ -41,6 +41,11 @@ async def batch_translate_srt(
 
     # --- select service provider ---
     if provider == "gemini":
+        if not settings.gemini_api_key:
+            raise HTTPException(
+                status_code=400,
+                detail="Gemini API key not configured. Please set GEMINI_API_KEY environment variable or use provider=openai"
+            )
         service = GeminiBatchTranslationService(settings)
     else:
         service = OpenAIBatchTranslationService(settings)
