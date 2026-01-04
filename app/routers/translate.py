@@ -9,6 +9,7 @@ from app.core.config import (
     TARGET_LANGUAGES,
 )
 from app.services.openai import OpenAIBatchTranslationService
+from app.services.gemini import GeminiBatchTranslationService
 
 router = APIRouter(prefix="/batch/translate", tags=["translate"])
 
@@ -19,6 +20,7 @@ async def batch_translate_srt(
     files: List[UploadFile] | UploadFile = File(...),
     languages: Optional[str] = Form(None),
     folder_id: Optional[str] = Form(None),
+    provider: Optional[str] = Form("openai"),  # openai or gemini
 ):
     settings: Settings = get_settings()
 
@@ -37,42 +39,92 @@ async def batch_translate_srt(
     os.makedirs(settings.output_folder, exist_ok=True)
     os.makedirs(settings.temp_folder, exist_ok=True)
 
-    service = OpenAIBatchTranslationService(settings)
+    # --- select service provider ---
+    if provider == "gemini":
+        service = GeminiBatchTranslationService(settings)
+    else:
+        service = OpenAIBatchTranslationService(settings)
 
     accepted_files = []
 
-    for file in files:
-        if not file.filename.lower().endswith(".srt"):
-            continue  # ili raise ako želiš strogo
+    if isinstance(files, list):
+        for file in files:
+            if not file.filename.lower().endswith(".srt"):
+                continue  # ili raise ako želiš strogo
 
-        base_name = os.path.splitext(file.filename)[0]
-        input_path = os.path.join(settings.input_folder, f"{base_name}.srt")
+            base_name = os.path.splitext(file.filename)[0]
+            input_path = os.path.join(settings.input_folder, f"{base_name}.srt")
 
-        try:
-            content = await file.read()
-            with open(input_path, "wb") as f:
-                f.write(content)
-        except Exception as e:
-            raise HTTPException(
-                status_code=500,
-                detail=f"Failed to save uploaded file {file.filename}: {str(e)}"
+            try:
+                content = await file.read()
+                with open(input_path, "wb") as f:
+                    f.write(content)
+            except Exception as e:
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Failed to save uploaded file {file.filename}: {str(e)}"
+                )
+
+            # --- enqueue background job per file ---
+            background_tasks.add_task(
+                service.translate_and_notify,
+                input_path=input_path,
+                base_name=base_name,
+                languages=language_list,
+                folder_id=folder_id,
             )
 
-        # --- enqueue background job per file ---
-        background_tasks.add_task(
-            service.translate_and_notify,
-            input_path=input_path,
-            base_name=base_name,
-            languages=language_list,
-            folder_id=folder_id,
-        )
+            accepted_files.append(file.filename)
+    # Handle single file case
+    else:
+        file = files  # files is already a single UploadFile
+        if file.filename.lower().endswith(".srt"):
+            base_name = os.path.splitext(file.filename)[0]
+            input_path = os.path.join(settings.input_folder, f"{base_name}.srt")
 
-        accepted_files.append(file.filename)
+            try:
+                content = await file.read()
+                with open(input_path, "wb") as f:
+                    f.write(content)
+            except Exception as e:
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Failed to save uploaded file {file.filename}: {str(e)}"
+                )
+
+            background_tasks.add_task(
+                service.translate_and_notify,
+                input_path=input_path,
+                base_name=base_name,
+                languages=language_list,
+                folder_id=folder_id,
+            )
+
+            accepted_files.append(file.filename)
+
 
     return {
         "status": "accepted",
+        "provider": provider,
         "files_count": len(accepted_files),
         "files": accepted_files,
         "languages_count": len(language_list),
         "message": "Batch translation jobs scheduled",
     }
+
+
+@router.post("/batch-translate-srt-gemini")
+async def batch_translate_srt_gemini(
+    background_tasks: BackgroundTasks,
+    files: List[UploadFile] | UploadFile = File(...),
+    languages: Optional[str] = Form(None),
+    folder_id: Optional[str] = Form(None),
+):
+    """Dedicated Gemini batch translation endpoint."""
+    return await batch_translate_srt(
+        background_tasks=background_tasks,
+        files=files,
+        languages=languages,
+        folder_id=folder_id,
+        provider="gemini"
+    )

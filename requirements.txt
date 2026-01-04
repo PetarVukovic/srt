@@ -10,4 +10,5 @@ pydantic
 pydantic-core
 chardet
 srt
+google-generativeai
 requests

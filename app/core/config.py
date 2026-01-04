@@ -11,7 +11,14 @@ class Settings(BaseSettings):
        validation_alias=AliasChoices("OPENAI_API_KEY","openai_api_key")
     )
 
-    openai_model: str = "gpt-4.1"
+    openai_model: str = "gpt-4.1-mini"
+
+    gemini_api_key: str = Field(
+        ...,
+        validation_alias=AliasChoices("GEMINI_API_KEY", "gemini_api_key")
+    )
+
+    gemini_model: str = "gemini-2.5-flash"
 
     n8n_webhook_url: str = Field(
         ...,
