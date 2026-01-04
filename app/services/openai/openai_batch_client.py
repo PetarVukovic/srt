@@ -69,7 +69,7 @@ class OpenAIBatchClient:
         )
         return response.id
 
-    async def wait_until_done(self, batch_id: str) -> tuple[str, dict]:
+    async def wait_until_done(self, batch_id: str, timeout_hours: int = 24) -> tuple[str, dict]:
         """
         Wait for batch job to complete and return results.
         
@@ -79,6 +79,8 @@ class OpenAIBatchClient:
         Args:
             batch_id (str): OpenAI batch ID from create_batch().
                           Used to monitor job progress.
+            timeout_hours (int): Maximum hours to wait before timeout.
+                                Default: 24 hours (matches OpenAI completion window)
                           
         Returns:
             tuple[str, dict]: Contains:
@@ -90,10 +92,26 @@ class OpenAIBatchClient:
                     
         Raises:
             OpenAIError: If batch fails or is cancelled.
-            TimeoutError: If batch takes too long (no explicit timeout).
+            TimeoutError: If batch takes too long.
         """
+        start_time = time.time()
+        timeout_seconds = timeout_hours * 3600
+        
         while True:
+            # Check timeout
+            if time.time() - start_time > timeout_seconds:
+                raise TimeoutError(f"Batch {batch_id} timed out after {timeout_hours} hours")
+            
             batch = await self.client.batches.retrieve(batch_id)
+            
+            # Check for failed status
+            if batch.status in ["failed", "cancelled", "expired"]:
+                error_msg = f"Batch {batch_id} failed with status: {batch.status}"
+                if batch.error:
+                    error_msg += f" - {batch.error}"
+                raise RuntimeError(error_msg)
+            
+            # Success case
             if batch.status == "completed":
                 usage = {}
                 if batch.usage:
@@ -102,7 +120,12 @@ class OpenAIBatchClient:
                         "output_tokens": batch.usage.output_tokens,
                         "total_tokens": batch.usage.total_tokens,
                     }
+                print(f"✅ Batch completed: {batch_id}")
+                print(f"📊 Token usage: {usage}")
                 return batch.output_file_id, usage
+            
+            # Continue polling
+            print(f"⏳ Batch status: {batch.status} (checking again in 60s)")
             await asyncio.sleep(60)
 
     async def download_results(self, file_id: str) -> str:

@@ -35,6 +35,10 @@ def cleanup_batch_files(base_name: str, settings: Settings) -> None:
     
     gemini_jsonl = os.path.join(settings.temp_folder, f"{base_name}_gemini_batch.jsonl")
     cleanup_file(gemini_jsonl)
+    
+    # Clean up OpenAI output JSONL
+    output_jsonl = os.path.join(settings.temp_folder, "output_batch.jsonl")
+    cleanup_file(output_jsonl)
 
 
 @router.post("/batch-translate-srt")

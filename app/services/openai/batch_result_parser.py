@@ -89,43 +89,75 @@ class BatchResultParser:
         return results
     @staticmethod
     def apply_translations(original_srt: str, translated_lines, output_srt: str):
-       # Detect encoding of original file
-       encoding = detect_file_encoding(original_srt)
-       
-       try:
-           with open(original_srt, encoding="utf-8") as f:
-               subtitles = list(srt.parse(f.read()))
-       except UnicodeDecodeError as e:
-           print(f"❌ Failed to read original SRT with utf-8: {e}")
-           # Try detected encoding first, then fallbacks
-           try:
-               with open(original_srt, encoding=encoding) as f:
-                   subtitles = list(srt.parse(f.read()))
-               print(f"✅ Successfully read original SRT with {encoding}")
-           except UnicodeDecodeError:
-               fallback_encodings = ['utf-16', 'latin-1', 'cp1252']
-               for enc in fallback_encodings:
-                   try:
-                       with open(original_srt, encoding=enc) as f:
-                           subtitles = list(srt.parse(f.read()))
-                       print(f"✅ Successfully read original SRT with {enc}")
-                       break
-                   except UnicodeDecodeError:
-                       continue
-               else:
-                   raise ValueError(f"Could not read original SRT file {original_srt}")
-       
-       for item in translated_lines:
-            idx = item["index"]
-
-            if 0 <= idx < len(subtitles):
-                subtitles[idx].content = item["content"]
-            else:
-                print(
-                    f"[BatchResultParser] Skipping out-of-range index {idx} "
-                    f"(subtitles length = {len(subtitles)})"
-                )
-
-       os.makedirs(os.path.dirname(output_srt), exist_ok=True)
-       with open(output_srt, "w", encoding="utf-8") as f:
-           f.write(srt.compose(subtitles))
+        """
+        Apply translated content to original SRT file.
+        
+        Args:
+            original_srt (str): Path to original SRT file
+            translated_lines (list): List of translated subtitle items
+            output_srt (str): Path for output SRT file
+        """
+        print(f"🔧 Applying translations to: {output_srt}")
+        print(f"📝 Original SRT: {original_srt}")
+        print(f"📊 Translated items: {len(translated_lines)}")
+        
+        # Detect encoding of original file
+        encoding = detect_file_encoding(original_srt)
+        print(f"🔍 Detected encoding: {encoding}")
+        
+        try:
+            with open(original_srt, encoding="utf-8") as f:
+                subtitles = list(srt.parse(f.read()))
+            print(f"✅ Successfully read original SRT with UTF-8")
+        except UnicodeDecodeError as e:
+            print(f"❌ Failed to read original SRT with utf-8: {e}")
+            # Try detected encoding first, then fallbacks
+            try:
+                with open(original_srt, encoding=encoding) as f:
+                    subtitles = list(srt.parse(f.read()))
+                print(f"✅ Successfully read original SRT with {encoding}")
+            except UnicodeDecodeError:
+                fallback_encodings = ['utf-16', 'latin-1', 'cp1252']
+                for enc in fallback_encodings:
+                    try:
+                        with open(original_srt, encoding=enc) as f:
+                            subtitles = list(srt.parse(f.read()))
+                        print(f"✅ Successfully read original SRT with {enc}")
+                        break
+                    except UnicodeDecodeError:
+                        continue
+                else:
+                    raise ValueError(f"Could not read original SRT file {original_srt}")
+        
+        print(f"📄 Original subtitles count: {len(subtitles)}")
+        
+        # Apply translations
+        applied_count = 0
+        skipped_count = 0
+        
+        for item in translated_lines:
+            try:
+                idx = item["index"]
+                
+                if 0 <= idx < len(subtitles):
+                    subtitles[idx].content = item["content"]
+                    applied_count += 1
+                else:
+                    print(f"⚠️ Skipping out-of-range index {idx} (subtitles length = {len(subtitles)})")
+                    skipped_count += 1
+            except (KeyError, TypeError) as e:
+                print(f"❌ Invalid translation item format: {e}")
+                skipped_count += 1
+        
+        print(f"✅ Applied {applied_count} translations")
+        print(f"⚠️ Skipped {skipped_count} items")
+        
+        # Create output directory
+        os.makedirs(os.path.dirname(output_srt), exist_ok=True)
+        
+        # Write translated SRT
+        with open(output_srt, "w", encoding="utf-8") as f:
+            f.write(srt.compose(subtitles))
+        
+        print(f"💾 Saved translated SRT: {output_srt}")
+        print(f"📏 Output file size: {os.path.getsize(output_srt)} bytes")

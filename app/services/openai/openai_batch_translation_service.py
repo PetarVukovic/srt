@@ -292,11 +292,6 @@ class OpenAIBatchTranslationService:
         })
 
         print("✅ Batch done & webhook(s) sent")
-
-
-        if not self.settings.deployment == "local":
-            os.unlink(input_path)
-            os.unlink(output_jsonl)
         
         return {
             "job": "srt-translation",
