@@ -24,6 +24,7 @@ Usage:
 """
 
 import os
+import asyncio
 from typing import List, Optional, Dict, Any
 from app.services.openai.batch_job_builder import MultiLangBatchJobBuilder
 from app.services.openai.openai_batch_client import OpenAIBatchClient
@@ -149,6 +150,80 @@ class OpenAIBatchTranslationService:
         """
         self.settings = settings
         self.webhook = WebhookService(settings)
+
+    async def translate_multiple_files(
+        self,
+        file_configs: List[Dict[str, Any]],  # [{"input_path": "...", "base_name": "...", "languages": [...]}]
+        folder_id: str = None,
+        max_concurrent: int = 3,
+    ):
+        """
+        Translate multiple SRT files concurrently.
+        
+        Args:
+            file_configs (List[Dict]): List of file configurations
+            folder_id (str): Optional folder ID
+            max_concurrent (int): Maximum concurrent translations (default: 3)
+            
+        Returns:
+            Dict[str, Any]: Combined results for all files
+        """
+        print(f"🚀 Starting translation of {len(file_configs)} files (max concurrent: {max_concurrent})")
+        
+        # Create semaphore to limit concurrent operations
+        semaphore = asyncio.Semaphore(max_concurrent)
+        
+        async def translate_single_with_limit(config):
+            async with semaphore:
+                try:
+                    return await self.translate_and_notify(
+                        input_path=config["input_path"],
+                        base_name=config["base_name"],
+                        languages=config["languages"],
+                        folder_id=folder_id,
+                    )
+                except Exception as e:
+                    print(f"❌ Failed to translate {config['base_name']}: {e}")
+                    return {
+                        "job": "srt-translation",
+                        "base_name": config["base_name"],
+                        "status": "failed",
+                        "error": str(e),
+                        "results": [],
+                        "pricing": {"total_cost": 0},
+                    }
+        
+        # Run translations concurrently
+        tasks = [translate_single_with_limit(config) for config in file_configs]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        
+        # Combine results
+        successful = [r for r in results if isinstance(r, dict) and r.get("status") != "failed"]
+        failed = [r for r in results if isinstance(r, dict) and r.get("status") == "failed"]
+        exceptions = [r for r in results if not isinstance(r, dict)]
+        
+        # Calculate total pricing
+        total_cost = sum(r.get("pricing", {}).get("total_cost", 0) for r in successful)
+        
+        combined_results = {
+            "job": "multi-file-translation",
+            "total_files": len(file_configs),
+            "successful_files": len(successful),
+            "failed_files": len(failed),
+            "exceptions": len(exceptions),
+            "successful_results": successful,
+            "failed_results": failed,
+            "total_cost": total_cost,
+            "folder_id": folder_id,
+        }
+        
+        print(f"✅ Multi-file translation completed:")
+        print(f"   📄 Successful: {len(successful)}")
+        print(f"   ❌ Failed: {len(failed)}")
+        print(f"   ⚠️ Exceptions: {len(exceptions)}")
+        print(f"   💰 Total cost: ${total_cost:.4f}")
+        
+        return combined_results
 
     async def translate_and_notify(
         self,

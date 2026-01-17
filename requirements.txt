@@ -12,3 +12,4 @@ chardet
 srt
 google-genai
 requests
+python-docx
