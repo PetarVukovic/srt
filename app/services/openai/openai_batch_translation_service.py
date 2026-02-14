@@ -25,6 +25,7 @@ Usage:
 
 import os
 import asyncio
+import srt
 from typing import List, Optional, Dict, Any
 from app.services.openai.batch_job_builder import MultiLangBatchJobBuilder
 from app.services.openai.openai_batch_client import OpenAIBatchClient
@@ -231,6 +232,7 @@ class OpenAIBatchTranslationService:
         base_name: str,
         languages: List[str],
         folder_id: str = None,
+        max_retries: int = 2,
     ):
         """
         Translate SRT file and send notification.
@@ -240,6 +242,7 @@ class OpenAIBatchTranslationService:
             base_name (str): Base name for output files
             languages (List[str]): List of target languages
             folder_id (str): Optional folder ID
+            max_retries (int): Maximum retries for incomplete translations
                              Example: "/path/to/subtitles.srt"
             
             base_name (str): Base name for output files (without extension).
@@ -269,62 +272,111 @@ class OpenAIBatchTranslationService:
         print(f"🌍 Languages: {languages}")
         print(f"📁 Input: {input_path}")
         
-        # 1. Build batch job for OpenAI processing
-        builder = MultiLangBatchJobBuilder(
-            model=self.settings.openai_model
-        )
-
-        # Generate temporary JSONL file path for batch requests
-        jsonl_path = os.path.join(
-            self.settings.temp_folder,
-            "input_batch.jsonl",
-        )
-
-        # Create structured batch requests for all languages
-        output_jsonl = builder.build(
-            input_srt=input_path,
-            languages=languages,
-            output_jsonl=jsonl_path,
-            batch_size=self.settings.batch_size,
-        )
+        # Track all results across retries
+        all_results = {}
+        total_usage = {"input_tokens": 0, "output_tokens": 0, "total_tokens": 0}
         
-        # Debug: Save JSONL locally for inspection
-        print(f"💾 JSONL saved to: {jsonl_path}")
-        print(f"📊 JSONL file size: {os.path.getsize(jsonl_path)} bytes")
+        # Languages to process (initially all)
+        remaining_languages = list(languages)
+        
+        for retry_attempt in range(max_retries + 1):
+            if not remaining_languages:
+                break
+                
+            if retry_attempt > 0:
+                print(f"🔄 RETRY {retry_attempt}/{max_retries} for {len(remaining_languages)} incomplete languages")
+            
+            # 1. Build batch job for OpenAI processing
+            builder = MultiLangBatchJobBuilder(
+                model=self.settings.openai_model
+            )
 
-        # 2. Execute batch job with OpenAI
-        client = OpenAIBatchClient(self.settings.openai_api_key)
+            # Generate temporary JSONL file path for batch requests
+            jsonl_path = os.path.join(
+                self.settings.temp_folder,
+                f"input_batch_retry{retry_attempt}.jsonl" if retry_attempt > 0 else "input_batch.jsonl",
+            )
 
-        # Upload batch file and create job
-        file_id = await client.upload(output_jsonl)
-        batch_id = await client.create_batch(file_id)
+            # Create structured batch requests for remaining languages
+            output_jsonl = builder.build(
+                input_srt=input_path,
+                languages=remaining_languages,
+                output_jsonl=jsonl_path,
+                batch_size=self.settings.batch_size,
+            )
+            
+            # Debug: Save JSONL locally for inspection
+            print(f"💾 JSONL saved to: {jsonl_path}")
+            print(f"📊 JSONL file size: {os.path.getsize(jsonl_path)} bytes")
 
-        print(f"⏳ OpenAI batch started: {batch_id}")
+            # 2. Execute batch job with OpenAI
+            client = OpenAIBatchClient(self.settings.openai_api_key)
 
-        # Wait for completion and download results
-        output_file_id, usage = await client.wait_until_done(batch_id)
-        batch_output = await client.download_results(output_file_id)
+            # Upload batch file and create job
+            file_id = await client.upload(output_jsonl)
+            batch_id = await client.create_batch(file_id)
+
+            print(f"⏳ OpenAI batch started: {batch_id}")
+
+            # Wait for completion and download results
+            output_file_id, usage = await client.wait_until_done(batch_id)
+            batch_output = await client.download_results(output_file_id)
+            
+            # Accumulate usage
+            total_usage["input_tokens"] += usage.get("input_tokens", 0)
+            total_usage["output_tokens"] += usage.get("output_tokens", 0)
+            total_usage["total_tokens"] += usage.get("total_tokens", 0)
+            
+            # Parse results
+            results = BatchResultParser.split_by_language(batch_output)
+            
+            # Merge results
+            for lang, lines in results.items():
+                if lang not in all_results:
+                    all_results[lang] = []
+                all_results[lang].extend(lines)
+            
+            # Check which languages are still incomplete
+            # Read original subtitle count
+            with open(input_path, "r", encoding="utf-8") as f:
+                original_subtitles = list(srt.parse(f.read()))
+            total_subtitles = len(original_subtitles)
+            
+            incomplete_languages = []
+            for lang in remaining_languages:
+                if lang in all_results:
+                    validation = BatchResultParser.validate_translation_coverage(
+                        all_results[lang], total_subtitles, lang
+                    )
+                    if not validation["is_complete"] and validation["coverage_percent"] < 95:
+                        incomplete_languages.append(lang)
+                else:
+                    incomplete_languages.append(lang)
+            
+            remaining_languages = incomplete_languages
+            
+            if not remaining_languages:
+                print(f"✅ All languages complete after attempt {retry_attempt + 1}")
+                break
+            else:
+                print(f"⚠️ {len(remaining_languages)} languages still incomplete: {remaining_languages[:5]}...")
 
         # 3. Calculate translation costs
         calculator = PricingCalculator(self.settings.openai_model)
 
         pricing = calculator.calculate(
             Usage(
-                prompt_tokens=usage.get("input_tokens", 0),
-                completion_tokens=usage.get("output_tokens", 0),
-                total_tokens=usage.get("total_tokens", 0),
+                prompt_tokens=total_usage.get("input_tokens", 0),
+                completion_tokens=total_usage.get("output_tokens", 0),
+                total_tokens=total_usage.get("total_tokens", 0),
             )
         )
-        
-        # Debug: Analyze batch output
-        #analyze_batch_output(batch_output, self.settings.temp_folder)
-        
-        results = BatchResultParser.split_by_language(batch_output)
 
         # Build payload for webhook notification
         bundle_payload = []
+        validation_results = []
 
-        for language, lines in results.items():
+        for language, lines in all_results.items():
             # Generate output file path for this language
             output_srt = os.path.join(
                 self.settings.output_folder,
@@ -338,11 +390,31 @@ class OpenAIBatchTranslationService:
                 continue
 
             # Apply translations to create final SRT file
-            BatchResultParser.apply_translations(
-                original_srt=input_path,
-                translated_lines=lines,
-                output_srt=output_srt,
-            )
+            try:
+                validation = BatchResultParser.apply_translations(
+                    original_srt=input_path,
+                    translated_lines=lines,
+                    output_srt=output_srt,
+                    language=language,
+                    strict_mode=False,  # Don't fail, but log warnings
+                )
+                
+                # Track validation results
+                validation_results.append(validation)
+                
+                # Log validation results
+                if not validation.get("is_complete", True):
+                    print(f"⚠️ {language}: {validation.get('coverage_percent', 0)}% coverage")
+                    
+            except Exception as e:
+                print(f"❌ Failed to apply translations for {language}: {e}")
+                validation_results.append({
+                    "language": language,
+                    "is_complete": False,
+                    "error": str(e),
+                    "coverage_percent": 0,
+                })
+                continue
 
             # Read translated content for webhook payload
             with open(output_srt, "r", encoding="utf-8") as f:
@@ -355,15 +427,35 @@ class OpenAIBatchTranslationService:
                 "content": content,
                 "folder_id": folder_id,
                 "pricing": pricing,
+                "validation": validation,  # Include validation info
             })
+
+        # Calculate validation summary
+        incomplete_translations = [v for v in validation_results if not v.get("is_complete", True)]
+        complete_count = len(validation_results) - len(incomplete_translations)
+        
+        validation_summary = {
+            "total_languages": len(validation_results),
+            "complete_count": complete_count,
+            "incomplete_count": len(incomplete_translations),
+            "incomplete_languages": [v.get("language") for v in incomplete_translations],
+            "all_complete": len(incomplete_translations) == 0,
+        }
+        
+        if incomplete_translations:
+            print(f"⚠️ VALIDATION WARNING: {len(incomplete_translations)} languages have incomplete translations")
+            for v in incomplete_translations:
+                print(f"   - {v.get('language')}: {v.get('coverage_percent', 0)}% coverage")
 
         # 5. Send webhook notification with complete results
         self.webhook.send({
             "job": "srt-translation",
+            "base_name": base_name,
             "total_languages": len(bundle_payload),
             "results": bundle_payload,
             "folder_id": folder_id,
             "pricing": pricing,
+            "validation_summary": validation_summary,
         })
 
         print("✅ Batch done & webhook(s) sent")

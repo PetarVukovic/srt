@@ -34,12 +34,14 @@ def safe_json_parse(content: str):
         return json.loads(match.group(1))
 
     raise ValueError("No valid JSON array found in LLM output")
-class BatchResultParser:
 
+
+class BatchResultParser:
 
     @staticmethod
     def split_by_language(batch_output: str):
         results = defaultdict(list)
+        errors_by_language = defaultdict(list)
 
         for line in batch_output.splitlines():
             line = line.strip()
@@ -54,6 +56,16 @@ class BatchResultParser:
 
             # Skip if record has errors or invalid status
             if record.get("error"):
+                # Track errors by language for reporting
+                custom_id = record.get("custom_id", "unknown")
+                try:
+                    lang, chunk_start = custom_id.rsplit(":", 1)
+                    errors_by_language[lang].append({
+                        "chunk_start": int(chunk_start),
+                        "error": record.get("error")
+                    })
+                except:
+                    pass
                 print(f"❌ Skipping record with error: {record.get('error')}")
                 continue
 
@@ -85,10 +97,64 @@ class BatchResultParser:
                 print(f"❌ Failed to parse content for {lang}: {e}")
                 continue
 
+        # Report errors
+        if errors_by_language:
+            print(f"⚠️ Translation errors by language:")
+            for lang, errors in errors_by_language.items():
+                print(f"   {lang}: {len(errors)} failed chunks")
+
         print(f"📊 Parsed results for {len(results)} languages: {list(results.keys())}")
         return results
+
     @staticmethod
-    def apply_translations(original_srt: str, translated_lines, output_srt: str):
+    def validate_translation_coverage(translated_lines: list, total_subtitles: int, language: str) -> dict:
+        """
+        Validate that all subtitle indices are covered by translation.
+        
+        Returns:
+            dict with validation results including missing indices
+        """
+        translated_indices = set()
+        duplicate_indices = []
+        
+        for item in translated_lines:
+            idx = item.get("index")
+            if idx is not None:
+                if idx in translated_indices:
+                    duplicate_indices.append(idx)
+                translated_indices.add(idx)
+        
+        expected_indices = set(range(total_subtitles))
+        missing_indices = expected_indices - translated_indices
+        extra_indices = translated_indices - expected_indices
+        
+        coverage_percent = (len(translated_indices & expected_indices) / total_subtitles * 100) if total_subtitles > 0 else 0
+        
+        validation = {
+            "language": language,
+            "total_expected": total_subtitles,
+            "total_translated": len(translated_indices),
+            "coverage_percent": round(coverage_percent, 2),
+            "missing_count": len(missing_indices),
+            "missing_indices": sorted(list(missing_indices))[:20],  # First 20 for logging
+            "duplicate_count": len(duplicate_indices),
+            "extra_indices": sorted(list(extra_indices))[:10],
+            "is_complete": len(missing_indices) == 0,
+        }
+        
+        if not validation["is_complete"]:
+            print(f"⚠️ INCOMPLETE TRANSLATION for {language}:")
+            print(f"   Coverage: {coverage_percent:.1f}%")
+            print(f"   Missing: {len(missing_indices)} indices")
+            print(f"   First missing: {validation['missing_indices'][:10]}")
+        else:
+            print(f"✅ COMPLETE translation for {language}: {coverage_percent:.1f}% coverage")
+        
+        return validation
+
+    @staticmethod
+    def apply_translations(original_srt: str, translated_lines, output_srt: str, 
+                          language: str = "unknown", strict_mode: bool = True):
         """
         Apply translated content to original SRT file.
         
@@ -96,10 +162,13 @@ class BatchResultParser:
             original_srt (str): Path to original SRT file
             translated_lines (list): List of translated subtitle items
             output_srt (str): Path for output SRT file
+            language (str): Target language for logging
+            strict_mode (bool): If True, raise error on incomplete translation
         """
         print(f"🔧 Applying translations to: {output_srt}")
         print(f"📝 Original SRT: {original_srt}")
         print(f"📊 Translated items: {len(translated_lines)}")
+        print(f"🌍 Language: {language}")
         
         # Detect encoding of original file
         encoding = detect_file_encoding(original_srt)
@@ -131,26 +200,53 @@ class BatchResultParser:
         
         print(f"📄 Original subtitles count: {len(subtitles)}")
         
+        # Validate translation coverage BEFORE applying
+        validation = BatchResultParser.validate_translation_coverage(
+            translated_lines, len(subtitles), language
+        )
+        
+        # Check for incomplete translation
+        if not validation["is_complete"]:
+            warning_msg = (
+                f"⚠️ INCOMPLETE TRANSLATION for {language}: "
+                f"{validation['coverage_percent']}% coverage, "
+                f"{validation['missing_count']} missing indices"
+            )
+            print(warning_msg)
+            
+            if strict_mode and validation["coverage_percent"] < 90:
+                raise ValueError(
+                    f"Translation for {language} is incomplete: "
+                    f"only {validation['coverage_percent']}% coverage. "
+                    f"Missing {validation['missing_count']} subtitles. "
+                    f"This would result in mixed-language output."
+                )
+        
         # Apply translations
         applied_count = 0
         skipped_count = 0
         
+        # Create a map for faster lookup
+        translation_map = {}
         for item in translated_lines:
             try:
                 idx = item["index"]
-                
-                if 0 <= idx < len(subtitles):
-                    subtitles[idx].content = item["content"]
-                    applied_count += 1
-                else:
-                    print(f"⚠️ Skipping out-of-range index {idx} (subtitles length = {len(subtitles)})")
-                    skipped_count += 1
-            except (KeyError, TypeError) as e:
-                print(f"❌ Invalid translation item format: {e}")
+                content = item["content"]
+                translation_map[idx] = content
+            except (KeyError, TypeError):
+                continue
+        
+        # Apply all translations
+        for idx in range(len(subtitles)):
+            if idx in translation_map:
+                subtitles[idx].content = translation_map[idx]
+                applied_count += 1
+            else:
+                # Mark untranslated subtitles (optional - for debugging)
                 skipped_count += 1
         
         print(f"✅ Applied {applied_count} translations")
-        print(f"⚠️ Skipped {skipped_count} items")
+        print(f"⚠️ Skipped {skipped_count} items (kept original)")
         
         # Create output directory
         os.makedirs(os.path.dirname(output_srt), exist_ok=True)
@@ -161,3 +257,5 @@ class BatchResultParser:
         
         print(f"💾 Saved translated SRT: {output_srt}")
         print(f"📏 Output file size: {os.path.getsize(output_srt)} bytes")
+        
+        return validation

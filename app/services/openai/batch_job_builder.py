@@ -145,8 +145,17 @@ class MultiLangBatchJobBuilder:
             output_jsonl (str): Output JSONL file path
             batch_size (int): Chunk size for processing
         """
-        # Safety limit for batch size
-        batch_size = min(batch_size, 60)
+        # Safety limit for batch size - reduced to 30 for better reliability
+        # Larger batches can cause:
+        # - Token limit truncation
+        # - JSON parsing failures
+        # - Incomplete translations for complex languages
+        batch_size = min(batch_size, 30)
+        
+        print(f"📦 Using batch_size: {batch_size} for {len(subtitles)} subtitles")
+        print(f"🌍 Languages: {len(languages)}")
+        total_requests = len(languages) * ((len(subtitles) + batch_size - 1) // batch_size)
+        print(f"📊 Total batch requests: {total_requests}")
 
         with open(output_jsonl, "w", encoding="utf-8") as f:
             for language in languages:
@@ -194,6 +203,7 @@ class MultiLangBatchJobBuilder:
             "body": {
                 "model": self.model,
                 "temperature": 0.2,
+                "max_tokens": 4096,  # Prevent output truncation
                 "messages": [
                     {
                         "role": "system",
