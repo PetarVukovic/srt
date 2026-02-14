@@ -272,6 +272,12 @@ class OpenAIBatchTranslationService:
         print(f"🌍 Languages: {languages}")
         print(f"📁 Input: {input_path}")
         
+        # Parse original subtitles once (needed for validation)
+        with open(input_path, "r", encoding="utf-8") as f:
+            original_subtitles = list(srt.parse(f.read()))
+        total_subtitles = len(original_subtitles)
+        print(f"📄 Original subtitles: {total_subtitles}")
+        
         # Track all results across retries
         all_results = {}
         total_usage = {"input_tokens": 0, "output_tokens": 0, "total_tokens": 0}
@@ -337,11 +343,6 @@ class OpenAIBatchTranslationService:
                 all_results[lang].extend(lines)
             
             # Check which languages are still incomplete
-            # Read original subtitle count
-            with open(input_path, "r", encoding="utf-8") as f:
-                original_subtitles = list(srt.parse(f.read()))
-            total_subtitles = len(original_subtitles)
-            
             incomplete_languages = []
             for lang in remaining_languages:
                 if lang in all_results:
@@ -389,22 +390,43 @@ class OpenAIBatchTranslationService:
                 print(f"❌ Original SRT file not found: {input_path}")
                 continue
 
-            # Apply translations to create final SRT file
+            # FIRST: Validate translation coverage BEFORE saving
+            pre_validation = BatchResultParser.validate_translation_coverage(
+                lines, total_subtitles, language
+            )
+            
+            # REJECT incomplete translations - do NOT save mixed-language files
+            if not pre_validation["is_complete"]:
+                coverage = pre_validation.get("coverage_percent", 0)
+                missing = pre_validation.get("missing_count", 0)
+                
+                print(f"❌ REJECTING {language}: Only {coverage}% coverage ({missing} missing subtitles)")
+                print(f"   This would create a mixed-language file. Skipping save.")
+                
+                validation_results.append({
+                    "language": language,
+                    "is_complete": False,
+                    "coverage_percent": coverage,
+                    "missing_count": missing,
+                    "status": "rejected",
+                    "reason": "Incomplete translation would create mixed-language output",
+                })
+                continue
+
+            # Apply translations to create final SRT file (only for complete translations)
             try:
                 validation = BatchResultParser.apply_translations(
                     original_srt=input_path,
                     translated_lines=lines,
                     output_srt=output_srt,
                     language=language,
-                    strict_mode=False,  # Don't fail, but log warnings
+                    strict_mode=True,  # Fail if incomplete
                 )
                 
                 # Track validation results
                 validation_results.append(validation)
                 
-                # Log validation results
-                if not validation.get("is_complete", True):
-                    print(f"⚠️ {language}: {validation.get('coverage_percent', 0)}% coverage")
+                print(f"✅ {language}: 100% coverage - saved successfully")
                     
             except Exception as e:
                 print(f"❌ Failed to apply translations for {language}: {e}")
@@ -413,6 +435,7 @@ class OpenAIBatchTranslationService:
                     "is_complete": False,
                     "error": str(e),
                     "coverage_percent": 0,
+                    "status": "failed",
                 })
                 continue
 
