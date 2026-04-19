@@ -94,7 +94,8 @@ class GeminiBatchClient:
             }
             
         except ClientError as e:
-            if e.status_code == 429:
+            status_code = getattr(e, "status_code", None) or getattr(e, "code", None)
+            if status_code == 429:
                 logger.warning("Gemini API quota exhausted: %s", e)
                 raise RuntimeError(
                     "Gemini API quota exhausted. Please check your quota at "
@@ -102,7 +103,7 @@ class GeminiBatchClient:
                 )
             else:
                 logger.exception("Failed to create Gemini batch job: %s", e)
-                raise
+                raise RuntimeError(f"Gemini batch create failed: {e}") from e
         except Exception as e:
             logger.exception("Failed to create Gemini batch job: %s", e)
             raise

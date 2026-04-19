@@ -206,26 +206,7 @@ class GeminiBatchJobBuilder:
                     }
                 ],
                 "generation_config": {
-                    "temperature": self.temperature,
-                    "thinking_config": {
-                        "thinking_level": self.thinking_level,
-                    },
-                    "response_mime_type": "application/json",
-                    "response_schema": {
-                        "type": "array",
-                        "items": {
-                            "type": "object",
-                            "properties": {
-                                "index": {
-                                    "type": "integer"
-                                },
-                                "content": {
-                                    "type": "string"
-                                }
-                            },
-                            "required": ["index", "content"]
-                        }
-                    }
+                    "temperature": self.temperature
                 }
             }
         }
