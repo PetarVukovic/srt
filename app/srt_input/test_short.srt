@@ -1,8 +1,0 @@
-1
-00:00:01,000 --> 00:00:03,000
-Hello everyone.
-
-2
-00:00:03,100 --> 00:00:05,500
-This is a short batch test.
-

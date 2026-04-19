@@ -7,3 +7,8 @@ jsonl
 tmp
 test
 logs/
+.DS_Store
+app/batch_inputs/
+app/batch_output/
+app/reports/
+app/srt_input/
