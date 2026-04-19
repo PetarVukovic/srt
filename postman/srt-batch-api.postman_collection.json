@@ -1,0 +1,157 @@
+{
+  "info": {
+    "_postman_id": "53f368bf-6f66-4f17-8618-69b4730854f1",
+    "name": "SRT Batch Translation API",
+    "description": "Postman kolekcija za SRT Translation Service batch endpoint-e.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Root Info",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                ""
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "health"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Batch Translate",
+      "item": [
+        {
+          "name": "Translate SRT (single or batch)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "files",
+                  "type": "file",
+                  "src": ""
+                },
+                {
+                  "key": "languages",
+                  "value": "{{languages}}",
+                  "type": "text"
+                },
+                {
+                  "key": "folder_id",
+                  "value": "{{folder_id}}",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/batch/translate/srt",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "batch",
+                "translate",
+                "srt"
+              ]
+            },
+            "description": "Podržava jedan ili više `files` polja. Dozvoljeni su samo `.srt` fajlovi."
+          },
+          "response": []
+        },
+        {
+          "name": "Translate Multiple (concurrent)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "files",
+                  "type": "file",
+                  "src": ""
+                },
+                {
+                  "key": "languages",
+                  "value": "{{languages}}",
+                  "type": "text"
+                },
+                {
+                  "key": "folder_id",
+                  "value": "{{folder_id}}",
+                  "type": "text"
+                },
+                {
+                  "key": "max_concurrent",
+                  "value": "{{max_concurrent}}",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/batch/translate/multiple",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "batch",
+                "translate",
+                "multiple"
+              ]
+            },
+            "description": "Pokreće paralelnu obradu više `.srt` fajlova (`max_concurrent` je ograničen backend postavkama)."
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8000"
+    },
+    {
+      "key": "languages",
+      "value": "sv-SE,en-GB,es-ES"
+    },
+    {
+      "key": "folder_id",
+      "value": ""
+    },
+    {
+      "key": "max_concurrent",
+      "value": "3"
+    }
+  ]
+}
