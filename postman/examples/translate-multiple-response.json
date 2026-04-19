@@ -1,0 +1,21 @@
+{
+  "status": "accepted",
+  "provider": "gemini",
+  "processing_mode": "concurrent",
+  "files_count": 2,
+  "max_files": 20,
+  "accepted_files": [
+    "episode1.srt",
+    "episode2.srt"
+  ],
+  "failed_files": [],
+  "languages_count": 4,
+  "languages": [
+    "English",
+    "German",
+    "French",
+    "Croatian"
+  ],
+  "max_concurrent": 2,
+  "message": "Scheduled 2 files for concurrent translation"
+}

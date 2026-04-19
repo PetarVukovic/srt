@@ -1,0 +1,18 @@
+{
+  "status": "accepted",
+  "provider": "gemini",
+  "files_count": 1,
+  "max_files": 20,
+  "accepted_files": [
+    "demo.srt"
+  ],
+  "failed_files": [],
+  "languages_count": 4,
+  "languages": [
+    "English",
+    "German",
+    "French",
+    "Croatian"
+  ],
+  "message": "Scheduled 1 translation jobs"
+}

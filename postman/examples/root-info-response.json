@@ -1,0 +1,20 @@
+{
+  "service": "SRT Translation Service",
+  "status": "active",
+  "version": "2.1.0",
+  "endpoints": {
+    "health": "/health",
+    "translate_single_or_batch": "/batch/translate/srt",
+    "translate_multiple": "/batch/translate/multiple"
+  },
+  "gemini": {
+    "model": "gemini-3-flash-preview",
+    "thinking_level": "low",
+    "temperature": 1.0
+  },
+  "supported_languages": 33,
+  "max_batch_files": 20,
+  "max_concurrent_files": 3,
+  "gemini_api_key_configured": true,
+  "reports_folder": "./app/reports"
+}

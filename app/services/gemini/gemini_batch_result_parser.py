@@ -10,7 +10,11 @@ import srt
 import os
 from collections import defaultdict
 from typing import Dict, List, Any, Optional
+
+from app.core.logging import get_logger
 from .gemini_batch_builder import detect_file_encoding
+
+logger = get_logger(__name__)
 
 class GeminiBatchResultParser:
     """
@@ -95,13 +99,13 @@ class GeminiBatchResultParser:
                 
                 # Check if this is a valid response
                 if 'response' not in parsed_line or not parsed_line['response']:
-                    print(f"⚠️ Skipping line without response")
+                    logger.warning("Skipping Gemini batch line without response")
                     continue
                 
                 # Extract language and chunk index from key
                 key = parsed_line.get('key', '')
                 if ':' not in key:
-                    print(f"⚠️ Invalid key format: {key}")
+                    logger.warning("Invalid Gemini batch key format: %s", key)
                     continue
                 
                 language, chunk_index = key.split(':', 1)
@@ -109,7 +113,7 @@ class GeminiBatchResultParser:
                 try:
                     chunk_index = int(chunk_index)
                 except ValueError:
-                    print(f"⚠️ Invalid chunk index: {chunk_index}")
+                    logger.warning("Invalid Gemini batch chunk index: %s", chunk_index)
                     continue
                 
                 # Parse the response content
@@ -130,10 +134,10 @@ class GeminiBatchResultParser:
                 # Add to results
                 results[language].extend(translated_items)
                 
-                print(f"✅ Successfully parsed {len(translated_items)} items for {language}")
+                logger.info("Parsed translated items | language=%s | count=%s", language, len(translated_items))
                 
             except Exception as e:
-                print(f"❌ Error parsing line: {e}")
+                logger.warning("Error parsing Gemini batch result line: %s", e)
                 continue
         
         return dict(results)
@@ -153,7 +157,7 @@ class GeminiBatchResultParser:
             output_srt (str): Path to save translated SRT file
         """
         if not translated_lines:
-            print("⚠️ No translated lines to apply")
+            logger.warning("No translated lines to apply")
             return
         
         # Read original SRT with encoding detection
@@ -164,7 +168,7 @@ class GeminiBatchResultParser:
                 original_content = f.read()
                 original_subtitles = list(srt.parse(original_content))
         except UnicodeDecodeError as e:
-            print(f"❌ Failed to read original SRT with {encoding}: {e}")
+            logger.warning("Failed to read original SRT with detected encoding %s: %s", encoding, e)
             # Try fallback encodings
             fallback_encodings = ['utf-8', 'utf-16', 'latin-1', 'cp1252']
             for enc in fallback_encodings:
@@ -172,7 +176,7 @@ class GeminiBatchResultParser:
                     with open(original_srt, "r", encoding=enc) as f:
                         original_content = f.read()
                         original_subtitles = list(srt.parse(original_content))
-                    print(f"✅ Successfully read original SRT with {enc}")
+                    logger.info("Successfully read original SRT with fallback encoding: %s", enc)
                     break
                 except UnicodeDecodeError:
                     continue
@@ -208,6 +212,50 @@ class GeminiBatchResultParser:
         # Save translated SRT
         with open(output_srt, "w", encoding="utf-8") as f:
             f.write(srt.compose(translated_subtitles))
-        
-        print(f"✅ Translations applied and saved to: {output_srt}")
-        print(f"📊 Translated {len(translation_map)} out of {len(original_subtitles)} subtitles")
+
+        logger.info(
+            "Translations applied and saved | path=%s | translated=%s | total=%s",
+            output_srt,
+            len(translation_map),
+            len(original_subtitles),
+        )
+
+    @staticmethod
+    def validate_translation_coverage(
+        translated_lines: List[Dict[str, Any]],
+        total_subtitles: int,
+        language: str,
+    ) -> Dict[str, Any]:
+        """
+        Validate that a translation covers the original subtitle set.
+
+        Args:
+            translated_lines: Translated subtitle items from Gemini output
+            total_subtitles: Number of subtitles in the original file
+            language: Target language label for reporting
+
+        Returns:
+            Dict[str, Any]: Validation summary
+        """
+        translated_indexes = {
+            item["index"]
+            for item in translated_lines
+            if isinstance(item, dict) and "index" in item and "content" in item
+        }
+        expected_indexes = set(range(total_subtitles))
+        missing_indexes = sorted(expected_indexes - translated_indexes)
+        extra_indexes = sorted(translated_indexes - expected_indexes)
+        translated_count = len(translated_indexes & expected_indexes)
+        coverage_percent = round((translated_count / total_subtitles) * 100, 2) if total_subtitles else 100.0
+
+        return {
+            "language": language,
+            "translated_count": translated_count,
+            "total_subtitles": total_subtitles,
+            "missing_count": len(missing_indexes),
+            "extra_count": len(extra_indexes),
+            "missing_indexes": missing_indexes[:25],
+            "extra_indexes": extra_indexes[:25],
+            "coverage_percent": coverage_percent,
+            "is_complete": translated_count == total_subtitles and not extra_indexes,
+        }

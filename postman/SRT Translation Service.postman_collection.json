@@ -1,0 +1,289 @@
+{
+  "info": {
+    "_postman_id": "a4ed8c07-1e29-4baf-bf69-1192ece0f111",
+    "name": "SRT Translation Service",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Detaljna Postman kolekcija za lokalno testiranje SRT Translation Service API-ja."
+  },
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Root Info",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                ""
+              ]
+            },
+            "description": "Vraća osnovne informacije o servisu, aktivnom Gemini modelu i konfiguraciji."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    ""
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [],
+              "body": "{\n  \"service\": \"SRT Translation Service\",\n  \"status\": \"active\",\n  \"version\": \"2.1.0\",\n  \"endpoints\": {\n    \"health\": \"/health\",\n    \"translate_single_or_batch\": \"/batch/translate/srt\",\n    \"translate_multiple\": \"/batch/translate/multiple\"\n  },\n  \"gemini\": {\n    \"model\": \"gemini-3-flash-preview\",\n    \"thinking_level\": \"low\",\n    \"temperature\": 1.0\n  },\n  \"supported_languages\": 33,\n  \"max_batch_files\": 20,\n  \"max_concurrent_files\": 3,\n  \"gemini_api_key_configured\": true,\n  \"reports_folder\": \"./app/reports\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/health",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "health"
+              ]
+            },
+            "description": "Najjednostavniji health check endpoint."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/health",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "health"
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [],
+              "body": "{\n  \"status\": \"healthy\",\n  \"timestamp\": 1712345678.123\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Translation",
+      "item": [
+        {
+          "name": "Translate SRT - Jedan ili više fileova",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "files",
+                  "type": "file",
+                  "src": []
+                },
+                {
+                  "key": "languages",
+                  "value": "{{languages_default}}",
+                  "type": "text"
+                },
+                {
+                  "key": "folder_id",
+                  "value": "{{folder_id}}",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/batch/translate/srt",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "batch",
+                "translate",
+                "srt"
+              ]
+            },
+            "description": "Uploadaj jedan ili više .srt fileova. Ako ne pošalješ `languages`, servis koristi default listu od 33 jezika."
+          },
+          "response": [
+            {
+              "name": "Accepted",
+              "originalRequest": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "files",
+                      "type": "file",
+                      "src": []
+                    },
+                    {
+                      "key": "languages",
+                      "value": "English,German,French,Croatian",
+                      "type": "text"
+                    },
+                    {
+                      "key": "folder_id",
+                      "value": "demo-folder-001",
+                      "type": "text"
+                    }
+                  ]
+                },
+                "url": {
+                  "raw": "{{base_url}}/batch/translate/srt",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "batch",
+                    "translate",
+                    "srt"
+                  ]
+                }
+              },
+              "status": "Accepted",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [],
+              "body": "{\n  \"status\": \"accepted\",\n  \"provider\": \"gemini\",\n  \"files_count\": 1,\n  \"max_files\": 20,\n  \"accepted_files\": [\n    \"demo.srt\"\n  ],\n  \"failed_files\": [],\n  \"languages_count\": 4,\n  \"languages\": [\n    \"English\",\n    \"German\",\n    \"French\",\n    \"Croatian\"\n  ],\n  \"message\": \"Scheduled 1 translation jobs\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Translate Multiple - Concurrency",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "files",
+                  "type": "file",
+                  "src": []
+                },
+                {
+                  "key": "files",
+                  "type": "file",
+                  "src": []
+                },
+                {
+                  "key": "languages",
+                  "value": "{{languages_default}}",
+                  "type": "text"
+                },
+                {
+                  "key": "folder_id",
+                  "value": "{{folder_id}}",
+                  "type": "text"
+                },
+                {
+                  "key": "max_concurrent",
+                  "value": "{{max_concurrent}}",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/batch/translate/multiple",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "batch",
+                "translate",
+                "multiple"
+              ]
+            },
+            "description": "Koristi za više fileova odjednom kad želiš ručno zadati concurrency limit."
+          },
+          "response": [
+            {
+              "name": "Accepted",
+              "originalRequest": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "files",
+                      "type": "file",
+                      "src": []
+                    },
+                    {
+                      "key": "files",
+                      "type": "file",
+                      "src": []
+                    },
+                    {
+                      "key": "languages",
+                      "value": "English,German,French,Croatian",
+                      "type": "text"
+                    },
+                    {
+                      "key": "folder_id",
+                      "value": "demo-folder-001",
+                      "type": "text"
+                    },
+                    {
+                      "key": "max_concurrent",
+                      "value": "2",
+                      "type": "text"
+                    }
+                  ]
+                },
+                "url": {
+                  "raw": "{{base_url}}/batch/translate/multiple",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "batch",
+                    "translate",
+                    "multiple"
+                  ]
+                }
+              },
+              "status": "Accepted",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [],
+              "body": "{\n  \"status\": \"accepted\",\n  \"provider\": \"gemini\",\n  \"processing_mode\": \"concurrent\",\n  \"files_count\": 2,\n  \"max_files\": 20,\n  \"accepted_files\": [\n    \"episode1.srt\",\n    \"episode2.srt\"\n  ],\n  \"failed_files\": [],\n  \"languages_count\": 4,\n  \"languages\": [\n    \"English\",\n    \"German\",\n    \"French\",\n    \"Croatian\"\n  ],\n  \"max_concurrent\": 2,\n  \"message\": \"Scheduled 2 files for concurrent translation\"\n}"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "variable": []
+}

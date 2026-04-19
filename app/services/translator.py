@@ -7,6 +7,9 @@ from typing import Dict, Any
 from gemini_srt_translator.main import GeminiSRTTranslator
 
 from app.core.config import Settings
+from app.core.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class SignalPatcher:
@@ -30,7 +33,7 @@ class SignalPatcher:
                 return original_signal(sig, handler)
             except ValueError as e:
                 if "signal only works in main thread" in str(e):
-                    print(f"⚠️ Ignoring signal setup in background thread for {language}")
+                    logger.warning("Ignoring signal setup in background thread for %s", language)
                     return None
                 raise
         
@@ -40,7 +43,7 @@ class SignalPatcher:
                     return original_raise_signal(sig)
             except ValueError as e:
                 if "signal only works in main thread" in str(e):
-                    print(f"⚠️ Ignoring signal raise in background thread for {language}")
+                    logger.warning("Ignoring signal raise in background thread for %s", language)
                     return None
                 raise
         

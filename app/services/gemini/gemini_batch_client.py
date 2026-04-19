@@ -13,6 +13,10 @@ from google.genai import types
 from google.genai.errors import ClientError
 import asyncio
 
+from app.core.logging import get_logger
+
+logger = get_logger(__name__)
+
 class GeminiBatchClient:
     """
     Client for interacting with Google Gemini's Batch API.
@@ -41,7 +45,7 @@ class GeminiBatchClient:
         Returns:
             str: Uploaded file name/URI
         """
-        print(f"📤 Uploading batch file: {jsonl_path}")
+        logger.info("Uploading Gemini batch file: %s", jsonl_path)
         
         try:
             uploaded_file = self.client.files.upload(
@@ -52,11 +56,11 @@ class GeminiBatchClient:
                 )
             )
             
-            print(f"✅ File uploaded: {uploaded_file.name}")
+            logger.info("Gemini batch file uploaded: %s", uploaded_file.name)
             return uploaded_file.name
             
         except Exception as e:
-            print(f"❌ Failed to upload file: {e}")
+            logger.exception("Failed to upload Gemini batch file: %s", e)
             raise
 
     async def create_batch_job(self, file_name: str, model: str, display_name: str) -> Dict[str, Any]:
@@ -71,7 +75,7 @@ class GeminiBatchClient:
         Returns:
             Dict[str, Any]: Batch job information
         """
-        print(f"🚀 Creating batch job: {display_name}")
+        logger.info("Creating Gemini batch job: %s", display_name)
         
         try:
             batch_job = self.client.batches.create(
@@ -82,7 +86,7 @@ class GeminiBatchClient:
                 },
             )
             
-            print(f"✅ Batch job created: {batch_job.name}")
+            logger.info("Gemini batch job created: %s", batch_job.name)
             return {
                 'name': batch_job.name,
                 'display_name': batch_job.display_name,
@@ -91,16 +95,16 @@ class GeminiBatchClient:
             
         except ClientError as e:
             if e.status_code == 429:
-                print(f"❌ Gemini API quota exhausted: {e}")
+                logger.warning("Gemini API quota exhausted: %s", e)
                 raise RuntimeError(
                     "Gemini API quota exhausted. Please check your quota at "
                     "https://aistudio.google.com/app/apikey and try again later."
                 )
             else:
-                print(f"❌ Failed to create batch job: {e}")
+                logger.exception("Failed to create Gemini batch job: %s", e)
                 raise
         except Exception as e:
-            print(f"❌ Failed to create batch job: {e}")
+            logger.exception("Failed to create Gemini batch job: %s", e)
             raise
 
     async def get_batch_status(self, batch_name: str) -> Dict[str, Any]:
@@ -125,7 +129,7 @@ class GeminiBatchClient:
             }
             
         except Exception as e:
-            print(f"❌ Failed to get batch status: {e}")
+            logger.exception("Failed to get Gemini batch status: %s", e)
             raise
 
     async def wait_until_done(self, batch_name: str, poll_interval: int = 30) -> tuple[str, Dict[str, Any]]:
@@ -139,7 +143,7 @@ class GeminiBatchClient:
         Returns:
             tuple[str, Dict[str, Any]]: (result_file_name, usage_info)
         """
-        print(f"⏳ Waiting for batch completion: {batch_name}")
+        logger.info("Waiting for Gemini batch completion: %s", batch_name)
         
         completed_states = {
             'JOB_STATE_SUCCEEDED',
@@ -153,7 +157,7 @@ class GeminiBatchClient:
                 batch_job = self.client.batches.get(name=batch_name)
                 state = batch_job.state.name if batch_job.state else None
                 
-                print(f"📊 Current state: {state}")
+                logger.info("Gemini batch state | batch=%s | state=%s", batch_name, state)
                 
                 if state in completed_states:
                     break
@@ -161,7 +165,7 @@ class GeminiBatchClient:
                 await asyncio.sleep(poll_interval)
                 
             except Exception as e:
-                print(f"❌ Error checking status: {e}")
+                logger.warning("Error checking Gemini batch status for %s: %s", batch_name, e)
                 await asyncio.sleep(poll_interval)
         
         if batch_job.state.name != 'JOB_STATE_SUCCEEDED':
@@ -181,9 +185,9 @@ class GeminiBatchClient:
                     'completion_tokens': getattr(usage_metadata, 'candidates_token_count', 0) or 0,
                     'total_tokens': getattr(usage_metadata, 'total_token_count', 0) or 0,
                 }
-                print(f"📊 Token usage: {usage_info}")
+                logger.info("Gemini token usage | batch=%s | usage=%s", batch_name, usage_info)
             else:
-                print("⚠️ No usage metadata found in batch job")
+                logger.warning("No usage metadata found in Gemini batch job: %s", batch_name)
                 # Try alternative locations for usage info
                 if hasattr(batch_job, 'usage') and batch_job.usage:
                     usage = batch_job.usage
@@ -200,7 +204,7 @@ class GeminiBatchClient:
                         'total_tokens': 0,
                     }
         except Exception as e:
-            print(f"❌ Error extracting usage info: {e}")
+            logger.warning("Error extracting Gemini usage info for %s: %s", batch_name, e)
             usage_info = {
                 'prompt_tokens': 0,
                 'completion_tokens': 0,
@@ -212,7 +216,7 @@ class GeminiBatchClient:
         if batch_job.dest and hasattr(batch_job.dest, 'file_name'):
             result_file_name = batch_job.dest.file_name
         
-        print(f"✅ Batch completed: {batch_job.name}")
+        logger.info("Gemini batch completed: %s", batch_job.name)
         return result_file_name, usage_info
 
     async def download_results(self, file_name: str) -> str:
@@ -225,17 +229,17 @@ class GeminiBatchClient:
         Returns:
             str: File content as string
         """
-        print(f"📥 Downloading results: {file_name}")
+        logger.info("Downloading Gemini batch results: %s", file_name)
         
         try:
             file_content = self.client.files.download(file=file_name)
             content = file_content.decode('utf-8')
             
-            print(f"✅ Results downloaded ({len(content)} bytes)")
+            logger.info("Gemini batch results downloaded | file=%s | bytes=%s", file_name, len(content))
             return content
             
         except Exception as e:
-            print(f"❌ Failed to download results: {e}")
+            logger.exception("Failed to download Gemini batch results %s: %s", file_name, e)
             raise
 
     async def cancel_batch(self, batch_name: str) -> bool:
@@ -250,11 +254,11 @@ class GeminiBatchClient:
         """
         try:
             self.client.batches.cancel(name=batch_name)
-            print(f"✅ Batch cancelled: {batch_name}")
+            logger.info("Gemini batch cancelled: %s", batch_name)
             return True
             
         except Exception as e:
-            print(f"❌ Failed to cancel batch: {e}")
+            logger.warning("Failed to cancel Gemini batch %s: %s", batch_name, e)
             return False
 
     async def delete_batch(self, batch_name: str) -> bool:
@@ -269,9 +273,9 @@ class GeminiBatchClient:
         """
         try:
             self.client.batches.delete(name=batch_name)
-            print(f"✅ Batch deleted: {batch_name}")
+            logger.info("Gemini batch deleted: %s", batch_name)
             return True
             
         except Exception as e:
-            print(f"❌ Failed to delete batch: {e}")
+            logger.warning("Failed to delete Gemini batch %s: %s", batch_name, e)
             return False

@@ -6,36 +6,41 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app import __version__
-from app.routers import health, translate
 from app.core.config import get_settings
+from app.core.logging import get_logger, setup_logging
+from app.routers import health, translate
 
-
-#TODO
-#1. Prebaciti txt filove da se spremaju u bazu podataka u postgres na render.com
+logger = get_logger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup
+    setup_logging()
     settings = get_settings()
-    print(f"🚀 SRT Translation Service v{__version__} started")
+    logger.info(
+        "SRT Translation Service started | version=%s | model=%s | deployment=%s",
+        __version__,
+        settings.gemini_model,
+        settings.deployment,
+    )
 
     yield
 
-    # Shutdown (ako ikad zatreba)
-    print("🛑 SRT Translation Service shutting down")
+    logger.info("SRT Translation Service shutting down")
 
 
 def create_app() -> FastAPI:
-    """Create and configure FastAPI application."""
+    """Create and configure the FastAPI application."""
 
     application = FastAPI(
         title="SRT Translation Service",
-        description="Translate SRT subtitle files to multiple languages using Gemini AI",
+        description=(
+            "Servis za obradu, spajanje i prijevod SRT titlova pomoću "
+            "Gemini Batch API-ja."
+        ),
         version=__version__,
         lifespan=lifespan,
     )
 
-    # CORS middleware
     application.add_middleware(
         CORSMiddleware,
         allow_origins=["*"],
@@ -44,7 +49,6 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
-    # Include routers
     application.include_router(health.router, tags=["Health"])
     application.include_router(translate.router)
 

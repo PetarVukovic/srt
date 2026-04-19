@@ -9,10 +9,13 @@ while translating content to multiple target languages simultaneously.
 """
 
 import json
-import os
 import srt
-from typing import List, Optional
+from typing import List
 import chardet
+
+from app.core.logging import get_logger
+
+logger = get_logger(__name__)
 
 def detect_file_encoding(file_path: str) -> str:
     """
@@ -31,16 +34,16 @@ def detect_file_encoding(file_path: str) -> str:
             encoding = result.get('encoding', 'utf-8')
             confidence = result.get('confidence', 0)
             
-            print(f"🔍 Detected encoding: {encoding} (confidence: {confidence:.2f})")
+            logger.info("Detected file encoding | encoding=%s | confidence=%.2f", encoding, confidence)
             
             # Fallback to utf-8 if confidence is too low
             if confidence < 0.7:
-                print("⚠️ Low confidence, falling back to utf-8")
+                logger.warning("Low encoding confidence, falling back to utf-8")
                 return 'utf-8'
                 
             return encoding
     except Exception as e:
-        print(f"❌ Encoding detection failed: {e}, falling back to utf-8")
+        logger.warning("Encoding detection failed, falling back to utf-8: %s", e)
         return 'utf-8'
 
 class GeminiBatchJobBuilder:
@@ -54,7 +57,7 @@ class GeminiBatchJobBuilder:
         model (str): Gemini model identifier (e.g., 'gemini-2.5-flash', 'gemini-1.5-pro')
     """
     
-    def __init__(self, model: str):
+    def __init__(self, model: str, temperature: float = 1.0, thinking_level: str = "low"):
         """
         Initialize the batch job builder.
         
@@ -64,6 +67,8 @@ class GeminiBatchJobBuilder:
                          Examples: 'gemini-2.5-flash', 'gemini-1.5-pro', 'gemini-1.5-flash'
         """
         self.model = model
+        self.temperature = temperature
+        self.thinking_level = thinking_level
 
     def build(
         self,
@@ -108,7 +113,7 @@ class GeminiBatchJobBuilder:
             with open(input_srt, "r", encoding=encoding) as f:
                 return list(srt.parse(f.read()))
         except UnicodeDecodeError as e:
-            print(f"❌ Failed to read with {encoding}: {e}")
+            logger.warning("Failed to read SRT with encoding %s: %s", encoding, e)
             return self._try_fallback_encodings(input_srt)
 
     def _try_fallback_encodings(self, input_srt: str) -> List[srt.Subtitle]:
@@ -127,7 +132,7 @@ class GeminiBatchJobBuilder:
             try:
                 with open(input_srt, "r", encoding=enc) as f:
                     subtitles = list(srt.parse(f.read()))
-                print(f"✅ Successfully read with {enc}")
+                logger.info("Successfully read SRT with fallback encoding: %s", enc)
                 return subtitles
             except UnicodeDecodeError:
                 continue
@@ -201,7 +206,10 @@ class GeminiBatchJobBuilder:
                     }
                 ],
                 "generation_config": {
-                    "temperature": 0.2,
+                    "temperature": self.temperature,
+                    "thinking_config": {
+                        "thinking_level": self.thinking_level,
+                    },
                     "response_mime_type": "application/json",
                     "response_schema": {
                         "type": "array",

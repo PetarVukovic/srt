@@ -1,31 +1,21 @@
-import os
-from functools import lru_cache
 from typing import List, Optional
 from pydantic_settings import BaseSettings
-from pydantic import Field,SecretStr,AliasChoices,PostgresDsn
+from pydantic import Field, AliasChoices
 
 
 class Settings(BaseSettings):
-    openai_api_key: str = Field(
-        ...,
-       validation_alias=AliasChoices("OPENAI_API_KEY","openai_api_key")
-    )
-
-    openai_model: str = "gpt-4.1-mini"
-
     gemini_api_key: Optional[str] = Field(
         None,
         validation_alias=AliasChoices("GEMINI_API_KEY", "gemini_api_key")
     )
 
-    gemini_model: str = "gemini-2.5-flash"
-
-    n8n_webhook_url: str = Field(
-        ...,
-        validation_alias=AliasChoices("N8N_WEBHOOK_URL", "N8N"),
-    )
+    gemini_model: str = "gemini-3-flash-preview"
+    gemini_temperature: float = 1.0
+    gemini_thinking_level: str = "low"
 
     batch_size: int = 100
+    max_batch_files: int = 20
+    max_concurrent_files: int = 3
 
     # Paths - different for local vs production
     @property
@@ -46,6 +36,12 @@ class Settings(BaseSettings):
             return "/opt/render/project/src/app/batch_inputs"
         return "./app/batch_inputs"
 
+    @property
+    def reports_folder(self) -> str:
+        if self.deployment == "prod":
+            return "/opt/render/project/src/app/reports"
+        return "./app/reports"
+
     # database_url: PostgresDsn = Field(
     #     ...,
     #     validation_alias=AliasChoices("DATABASE_URL", "database_url"),
@@ -61,7 +57,6 @@ class Settings(BaseSettings):
         "env_file_encoding": "utf-8",
         "extra": "ignore"
     }
-
 
 
 def get_settings() -> Settings:
